@@ -5,7 +5,7 @@ Instrmt is a library providing an API abstracting multiple instrumentation/traci
 It currently supports three "instrumentation engines":
 
 - _tty_: basic engine printing instrumentation results to the console.
-- _itt_: [Intel ITT API](https://software.intel.com/content/www/us/en/develop/articles/intel-itt-api-open-source.html).
+- _itt_: [Intel ITT API](https://software.intel.com/content/www/us/en/develop/articles/intel-itt-api-open-source.html), for VTune or [Intel SEAPI](https://github.com/intel/IntelSEAPI).
 - _tracy_: [Tracy profiler](https://github.com/wolfpld/tracy).
 
 ## Usage

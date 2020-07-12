@@ -1,4 +1,4 @@
-#include "instrmt.hxx"
+#include "instrmt/instrmt.hxx"
 
 #include <ittnotify.h>
 
