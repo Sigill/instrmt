@@ -43,11 +43,13 @@ target_link_libraries(instrmt-tty PRIVATE instrmt)
 instrmt_install_target(instrmt-tty)
 
 option(INSTRMT_BUILD_TRACY_ENGINE "" OFF)
+
 if (INSTRMT_BUILD_TRACY_ENGINE)
-    find_library(TRACY_LIBRARY NAMES tracy HINTS $ENV{TRACY_ROOT}/lib ${TRACY_ROOT}/lib)
+    set(TRACY_ROOT "" CACHE PATH "Root directory of Tracy")
+
+    find_library(TRACY_LIBRARY tracy HINTS $ENV{TRACY_ROOT}/lib ${TRACY_ROOT}/lib)
     find_path(TRACY_INCLUDE_DIR Tracy.hpp HINTS $ENV{TRACY_ROOT}/include ${TRACY_ROOT}/include)
-    mark_as_advanced(TRACY_LIBRARY)
-    mark_as_advanced(TRACY_INCLUDE_DIR)
+    mark_as_advanced(TRACY_LIBRARY TRACY_INCLUDE_DIR)
 
     if (NOT TRACY_LIBRARY OR NOT TRACY_INCLUDE_DIR)
         message(FATAL_ERROR "Unable to find Tracy's library, please set TRACY_ROOT")
@@ -75,13 +77,11 @@ if (INSTRMT_BUILD_ITT_ENGINE)
         set(VTUNE_LIB_DIR "lib32")
     endif()
 
-    set(VTUNE_ROOT /opt/intel/vtune_profiler)
+    set(VTUNE_ROOT /opt/intel/vtune_profiler CACHE PATH "Root directory of VTune's profiler")
 
-    find_library(ITTNOTIFY_LIBRARY NAMES ittnotify HINTS $ENV{VTUNE_ROOT}/${VTUNE_LIB_DIR} ${VTUNE_ROOT}/${VTUNE_LIB_DIR})
-
+    find_library(ITTNOTIFY_LIBRARY ittnotify HINTS $ENV{VTUNE_ROOT}/${VTUNE_LIB_DIR} ${VTUNE_ROOT}/${VTUNE_LIB_DIR})
     find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS $ENV{VTUNE_ROOT}/include ${VTUNE_ROOT}/include)
-    mark_as_advanced(ITTNOTIFY_LIBRARY)
-    mark_as_advanced(ITTNOTIFY_INCLUDE_DIR)
+    mark_as_advanced(ITTNOTIFY_LIBRARY ITTNOTIFY_INCLUDE_DIR)
 
     if (NOT ITTNOTIFY_LIBRARY OR NOT ITTNOTIFY_INCLUDE_DIR)
         message(FATAL_ERROR "Unable to find ittnotify library, please set VTUNE_ROOT")
@@ -102,8 +102,7 @@ endif()
 # Create the export file for the build tree.
 export(TARGETS instrmt FILE "${PROJECT_BINARY_DIR}/${INSTRMT_EXPORT}.cmake")
 # Create the export file for the install tree.
-install(EXPORT ${INSTRMT_EXPORT}
-    DESTINATION "${CMAKE_INSTALL_PREFIX}")
+install(EXPORT ${INSTRMT_EXPORT} DESTINATION ".")
 
 # The config files could be generated using a macro (see [1]), but it seems
 # to be more complex than to do it manually (see [2]).
