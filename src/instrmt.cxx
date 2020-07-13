@@ -11,6 +11,7 @@ class EngineBuilder : public instrmt::Engine {
 public:
   using instrmt::Engine::handle;
   using instrmt::Engine::region_context_factory;
+  using instrmt::Engine::message_context_factory;
 };
 
 instrmt::Engine load_telemetry_engine() {
@@ -27,14 +28,28 @@ instrmt::Engine load_telemetry_engine() {
     return e;
   }
 
-  // reset errors
-  dlerror();
+  {
+    // reset errors
+    dlerror();
 
-  // load the symbols
-  e.region_context_factory = (instrmt::RegionContextFactory*)dlsym(e.handle, "make_region_context");
-  const char* dlsym_error = dlerror();
-  if (dlsym_error) {
-    std::cerr << "\e[1;31mCannot load symbol make_region_context from " << engine_lib << ": " << dlerror() << "\e[0m\n";
+    // load the symbols
+    e.region_context_factory = (instrmt::RegionContextFactory*)dlsym(e.handle, "make_region_context");
+    const char* dlsym_error = dlerror();
+    if (dlsym_error) {
+      std::cerr << "\e[1;31mCannot load symbol make_region_context from " << engine_lib << ": " << dlerror() << "\e[0m\n";
+    }
+  }
+
+  {
+    // reset errors
+    dlerror();
+
+    // load the symbols
+    e.message_context_factory = (instrmt::MessageContextFactory*)dlsym(e.handle, "make_message_context");
+    const char* dlsym_error = dlerror();
+    if (dlsym_error) {
+      std::cerr << "\e[1;31mCannot load symbol make_message_context from " << engine_lib << ": " << dlerror() << "\e[0m\n";
+    }
   }
 
   return e;
@@ -45,12 +60,20 @@ instrmt::Engine load_telemetry_engine() {
 namespace instrmt {
 
 std::unique_ptr<RegionContext> Engine::make_region_context(const char* name,
-                                                         const char* function,
-                                                         const char* file,
-                                                         int line) const
+                                                           const char* function,
+                                                           const char* file,
+                                                           int line) const
 {
   if (region_context_factory)
     return std::unique_ptr<RegionContext>(region_context_factory(name, function, file, line));
+  else
+    return {};
+}
+
+std::unique_ptr<MessageContext> Engine::make_message_context(const char* msg) const
+{
+  if (message_context_factory)
+    return std::unique_ptr<MessageContext>(message_context_factory(msg));
   else
     return {};
 }

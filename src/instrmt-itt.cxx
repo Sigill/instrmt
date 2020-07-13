@@ -34,9 +34,19 @@ public:
   };
 };
 
+class MessageContext : public instrmt::MessageContext {
+private:
+  __itt_string_handle *string_handle;
+
+public:
+  explicit MessageContext(const char* msg);
+
+  void emit_message() const override;
+};
+
 RegionContext::RegionContext(const char *name)
-: ::instrmt::RegionContext()
-, string_handle(__itt_string_handle_create(name))
+  : ::instrmt::RegionContext()
+  , string_handle(__itt_string_handle_create(name))
 {}
 
 Region::Region(__itt_string_handle *pName)
@@ -54,6 +64,15 @@ Region::~Region()
   }
 }
 
+MessageContext::MessageContext(const char* msg)
+  : ::instrmt::MessageContext()
+  , string_handle(__itt_string_handle_create(msg))
+{}
+
+void MessageContext::emit_message() const {
+  __itt_marker(instrmt_domain, __itt_null, string_handle, __itt_scope_global);
+}
+
 } // namespace itt
 } // namespace instrmt
 
@@ -65,6 +84,11 @@ instrmt::RegionContext* make_region_context(const char* name,
                                       int /*line*/)
 {
   return new instrmt::itt::RegionContext(name ? name : function);
+}
+
+::instrmt::MessageContext* make_message_context(const char* msg)
+{
+  return new instrmt::itt::MessageContext(msg);
 }
 
 } // extern C

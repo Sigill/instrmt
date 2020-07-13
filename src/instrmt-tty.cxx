@@ -83,6 +83,17 @@ public:
   Region* make_region_ptr() override;
 };
 
+class MessageContext : public instrmt::MessageContext {
+private:
+  const char* msg;
+  int color;
+
+public:
+  explicit MessageContext(const char* msg);
+
+  void emit_message() const override;
+};
+
 Region::Region(const char* name)
   : instrmt::Region()
   , name(name)
@@ -108,14 +119,29 @@ Region*RegionContext::make_region_ptr()
   return new Region(name);
 }
 
+MessageContext::MessageContext(const char* msg)
+  : instrmt::MessageContext ()
+  , msg(msg)
+  , color(string_color(msg))
+{}
+
+void MessageContext::emit_message() const {
+  printf("\e[0;%dm%-40s\e[0m\n", color, msg);
+}
+
 extern "C" {
 
 ::instrmt::RegionContext* make_region_context(const char* name,
-                                          const char* function,
-                                          const char* /*file*/,
-                                          int /*line*/)
+                                              const char* function,
+                                              const char* /*file*/,
+                                              int /*line*/)
 {
   return new instrmt::tty::RegionContext(name ? name : function);
+}
+
+::instrmt::MessageContext* make_message_context(const char* msg)
+{
+  return new instrmt::tty::MessageContext(msg);
 }
 
 } // extern C
