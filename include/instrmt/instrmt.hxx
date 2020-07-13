@@ -49,7 +49,7 @@ const Engine& engine();
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
   static const std::unique_ptr<::instrmt::RegionContext> INSTRMTCONCAT(VAR, _instrmt_region_ctx) = \
     ::instrmt::engine().make_region_context(NAME, __FUNCTION__, __FILE__, __LINE__); \
-  std::unique_ptr<::instrmt::Region> INSTRMTCONCAT(VAR, _instrmt_region) = VAR ## _instrmt_region_ctx ? INSTRMTCONCAT(VAR, _instrmt_region_ctx)->make_region() : nullptr
+  std::unique_ptr<::instrmt::Region> INSTRMTCONCAT(VAR, _instrmt_region) = INSTRMTCONCAT(VAR, _instrmt_region_ctx) ? INSTRMTCONCAT(VAR, _instrmt_region_ctx)->make_region() : nullptr
 
 #define INSTRMT_NAMED_REGION_END(VAR) \
   INSTRMTCONCAT(VAR, _instrmt_region).reset()

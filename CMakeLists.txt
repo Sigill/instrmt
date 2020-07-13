@@ -70,12 +70,14 @@ option(INSTRMT_BUILD_ITT_ENGINE "" OFF)
 if (INSTRMT_BUILD_ITT_ENGINE)
     set(VTUNE_LIB_SUFFIX "")
     if(CMAKE_SIZEOF_VOID_P MATCHES "8")
-        set(VTUNE_LIB_SUFFIX "64")
+        set(VTUNE_LIB_DIR "lib64")
+    else()
+        set(VTUNE_LIB_DIR "lib32")
     endif()
 
     set(VTUNE_ROOT /opt/intel/vtune_profiler)
 
-    find_library(ITTNOTIFY_LIBRARY NAMES ittnotify HINTS $ENV{VTUNE_ROOT}/lib${VTUNE_LIB_SUFFIX} ${VTUNE_ROOT}/lib${VTUNE_LIB_SUFFIX})
+    find_library(ITTNOTIFY_LIBRARY NAMES ittnotify HINTS $ENV{VTUNE_ROOT}/${VTUNE_LIB_DIR} ${VTUNE_ROOT}/${VTUNE_LIB_DIR})
 
     find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS $ENV{VTUNE_ROOT}/include ${VTUNE_ROOT}/include)
     mark_as_advanced(ITTNOTIFY_LIBRARY)
