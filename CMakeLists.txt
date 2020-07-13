@@ -4,6 +4,9 @@ project(Instrmt)
 set(INSTRMT_VERSION "0.1.0")
 
 include(GNUInstallDirs)
+set(CMAKE_INSTALL_CMAKEDIR "share/cmake" CACHE PATH "Install location for cmake related files")
+mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
+
 include(CMakePackageConfigHelpers)
 
 set(INSTRMT_EXPORT InstrmtTargets)
@@ -102,7 +105,7 @@ endif()
 # Create the export file for the build tree.
 export(TARGETS instrmt FILE "${PROJECT_BINARY_DIR}/${INSTRMT_EXPORT}.cmake")
 # Create the export file for the install tree.
-install(EXPORT ${INSTRMT_EXPORT} DESTINATION ".")
+install(EXPORT ${INSTRMT_EXPORT} DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
 
 # The config files could be generated using a macro (see [1]), but it seems
 # to be more complex than to do it manually (see [2]).
@@ -129,4 +132,4 @@ write_basic_package_version_file(
 install(FILES
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/InstrmtConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_PREFIX}")
+    DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
