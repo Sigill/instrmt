@@ -10,9 +10,7 @@ It currently supports three "instrumentation engines":
 
 ## Usage
 
-Instrmt API is disabled by default (the macros are no-op, linking to `libinstrmt` is not required).
-
-It is enabled by defining the `INSTRMT_ENABLE` compilation option.
+Instrmt API can be disabled (rendering the macros are no-op, and linking to `libinstrmt` not required) by defining the `INSTRMT_DISABLE` compilation option.
 
 The instrumentation engine to use must be specified by the `INSTRMT_ENGINE` environment variable. When undefined, the overhead should be minimal.
 
@@ -51,7 +49,7 @@ int main(int, char**) {
 ```
 
 ```
-$ g++ main.cpp -DINSTRMT_ENABLE -I/path/to/instrmt/include -L/path/to/instrmt/lib -linstrmt -ldl -o main
+$ g++ main.cpp -I/path/to/instrmt/include -L/path/to/instrmt/lib -linstrmt -ldl -o main
 
 $ ./main
 # No instrumentation

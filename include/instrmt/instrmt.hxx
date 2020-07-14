@@ -1,7 +1,7 @@
 #ifndef INSTRMT_HXX
 #define INSTRMT_HXX
 
-#ifdef INSTRMT_ENABLE
+#ifndef INSTRMT_DISABLE
 
 #include <memory>
 
@@ -63,7 +63,7 @@ const Engine& engine();
 #define INSTRMT_FUNCTION() \
   INSTRMT_NAMED_REGION(_, nullptr)
 
-#else // INSTRMT_ENABLE
+#else // INSTRMT_DISABLE
 
 #define INSTRMT_NAMED_REGION(VAR, NAME)
 
@@ -75,6 +75,6 @@ const Engine& engine();
 
 #define INSTRMT_FUNCTION(NAME)
 
-#endif // INSTRMT_ENABLE
+#endif // INSTRMT_DISABLE
 
 #endif // INSTRMT_HXX
