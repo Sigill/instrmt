@@ -24,21 +24,21 @@ function(instrmt_install_target e)
     install(TARGETS ${e} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endfunction()
 
-add_library(instrmt SHARED src/instrmt.cxx)
+add_library(instrmt SHARED instrmt/instrmt.cxx)
 target_include_directories(instrmt
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
            $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(instrmt PRIVATE dl)
 
 # Define public headers to get them automatically installed.
 set_target_properties(instrmt PROPERTIES
-    PUBLIC_HEADER include/instrmt/instrmt.hxx)
+    PUBLIC_HEADER instrmt/instrmt.hxx)
 
 instrmt_export_install_targets(instrmt)
 
-add_library(instrmt-tty MODULE src/instrmt-tty.cxx)
-target_include_directories(instrmt-tty PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_library(instrmt-tty MODULE instrmt/instrmt-tty.cxx)
+target_include_directories(instrmt-tty PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(instrmt-tty PRIVATE instrmt)
 
 instrmt_install_target(instrmt-tty)
@@ -63,7 +63,7 @@ if (INSTRMT_BUILD_TRACY_ENGINE)
         IMPORTED_LINK_INTERFACE_LIBRARIES "dl;pthread"
         COMPILE_DEFINITIONS TRACY_ENABLE)
 
-    add_library(instrmt-tracy MODULE src/instrmt-tracy.cxx)
+    add_library(instrmt-tracy MODULE instrmt/instrmt-tracy.cxx)
     target_link_libraries(instrmt-tracy PRIVATE instrmt tracy)
     instrmt_install_target(instrmt-tracy)
 endif()
@@ -93,7 +93,7 @@ if (INSTRMT_BUILD_ITT_ENGINE)
         INTERFACE_INCLUDE_DIRECTORIES "${ITTNOTIFY_INCLUDE_DIR}"
         IMPORTED_LINK_INTERFACE_LIBRARIES "dl;pthread")
 
-    add_library(instrmt-itt MODULE src/instrmt-itt.cxx)
+    add_library(instrmt-itt MODULE instrmt/instrmt-itt.cxx)
     target_link_libraries(instrmt-itt PRIVATE instrmt ittnotify)
     instrmt_install_target(instrmt-itt)
 endif()
@@ -109,7 +109,7 @@ install(EXPORT ${INSTRMT_EXPORT} DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
 # [2] https://gitlab.kitware.com/cmake/community/wikis/doc/tutorials/How-to-create-a-ProjectConfig.cmake-file
 
 # Create the config file for the build tree.
-set(CONF_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set(CONF_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 configure_file(InstrmtConfig.in.cmake
     "${PROJECT_BINARY_DIR}/InstrmtConfig.cmake" @ONLY)
 
