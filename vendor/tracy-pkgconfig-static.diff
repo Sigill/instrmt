@@ -1,0 +1,11 @@
+--- a/profiler/build/unix/build.mk	2020-06-11 14:30:34.000000000 +0200
++++ b/profiler/build/unix/build.mk	2020-07-25 18:35:00.364617214 +0200
+@@ -2,7 +2,7 @@
+ CXXFLAGS := $(CFLAGS) -std=c++17
+ DEFINES += -DIMGUI_IMPL_OPENGL_LOADER_GL3W
+ INCLUDES := $(shell pkg-config --cflags glfw3 freetype2 capstone) -I../../../imgui -I../../libs/gl3w
+-LIBS := $(shell pkg-config --libs glfw3 freetype2 capstone) -lpthread -ldl
++LIBS := $(shell pkg-config --libs --static glfw3 freetype2 capstone) -lpthread -ldl
+ PROJECT := Tracy
+ IMAGE := $(PROJECT)-$(BUILD)
+ 
