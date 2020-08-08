@@ -203,7 +203,7 @@ while (( "$#" )); do
 done
 
 [ -n "$build_cmake2" ] && install_cmake2
-[ -n "$vcmake3" ] && install_cmake3
+[ -n "$build_cmake3" ] && install_cmake3
 [ -n "$build_ittapi" ] && install_ittapi
 [ -n "$build_capstone" ] && install_capstone
 [ -n "$build_glfw" ] && install_glfw

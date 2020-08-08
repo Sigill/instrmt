@@ -3,53 +3,20 @@
 
 #ifndef INSTRMT_DISABLE
 
-#include <memory>
+#ifdef INSTRMT_CXX_WRAPPER
+#include INSTRMT_CXX_WRAPPER
+#else
 
-namespace instrmt {
-
-class Region {
-public:
-  virtual ~Region() = default;
-};
-
-class RegionContext {
-protected:
-  virtual Region* make_region_ptr() { return nullptr; }
-
-public:
-  virtual ~RegionContext() = default;
-
-  std::unique_ptr<Region> make_region();
-};
-
-typedef RegionContext* RegionContextFactory(const char* /*name*/,
-                                        const char* /*function*/,
-                                        const char* /*file*/,
-                                        int /*line*/);
-
-class Engine {
-protected:
-  void* handle = nullptr;
-  RegionContextFactory* region_context_factory = nullptr;
-
-public:
-  std::unique_ptr<RegionContext> make_region_context(const char* name,
-                                                   const char* function,
-                                                   const char* file,
-                                                   int line) const;
-};
-
-const Engine& engine();
-
-} // namespace instrmt
-
-#define INSTRMTCONCATIMPL(x,y) x##y
-#define INSTRMTCONCAT(x,y) INSTRMTCONCATIMPL(x,y)
+#include <instrmt/details/engine.hxx>
+#include <instrmt/details/utils.h>
 
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
   static const std::unique_ptr<::instrmt::RegionContext> INSTRMTCONCAT(VAR, _instrmt_region_ctx) = \
-    ::instrmt::engine().make_region_context(NAME, __FUNCTION__, __FILE__, __LINE__); \
+    ::instrmt::make_region_context(NAME, __FUNCTION__, __FILE__, __LINE__); \
   std::unique_ptr<::instrmt::Region> INSTRMTCONCAT(VAR, _instrmt_region) = INSTRMTCONCAT(VAR, _instrmt_region_ctx) ? INSTRMTCONCAT(VAR, _instrmt_region_ctx)->make_region() : nullptr
+
+#define INSTRMT_NAMED_REGION_BEGIN(VAR, NAME) \
+  INSTRMT_NAMED_REGION(VAR, NAME)
 
 #define INSTRMT_NAMED_REGION_END(VAR) \
   INSTRMTCONCAT(VAR, _instrmt_region).reset()
@@ -57,11 +24,16 @@ const Engine& engine();
 #define INSTRMT_REGION(NAME) \
   INSTRMT_NAMED_REGION(_, NAME)
 
+#define INSTRMT_REGION_BEGIN(NAME) \
+  INSTRMT_NAMED_REGION(_, NAME)
+
 #define INSTRMT_REGION_END()\
   INSTRMT_NAMED_REGION_END(_)
 
 #define INSTRMT_FUNCTION() \
   INSTRMT_NAMED_REGION(_, nullptr)
+
+#endif // INSTRMT_CXX_WRAPPER
 
 #else // INSTRMT_DISABLE
 
@@ -73,7 +45,7 @@ const Engine& engine();
 
 #define INSTRMT_REGION_END()
 
-#define INSTRMT_FUNCTION(NAME)
+#define INSTRMT_FUNCTION()
 
 #endif // INSTRMT_DISABLE
 

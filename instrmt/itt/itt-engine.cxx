@@ -1,4 +1,4 @@
-#include "instrmt/instrmt.hxx"
+#include <instrmt/details/base.hxx>
 
 #include <ittnotify.h>
 
@@ -35,13 +35,13 @@ public:
 };
 
 RegionContext::RegionContext(const char *name)
-: ::instrmt::RegionContext()
-, string_handle(__itt_string_handle_create(name))
+  : ::instrmt::RegionContext()
+  , string_handle(__itt_string_handle_create(name))
 {}
 
 Region::Region(__itt_string_handle *pName)
-: name(pName)
-, m_id(__itt_id_make(instrmt_domain, reinterpret_cast<unsigned long long>(pName)))
+  : name(pName)
+  , m_id(__itt_id_make(instrmt_domain, reinterpret_cast<unsigned long long>(pName)))
 {
   __itt_task_begin(instrmt_domain, m_id, __itt_null, pName);
 }
@@ -60,9 +60,9 @@ Region::~Region()
 extern "C" {
 
 instrmt::RegionContext* make_region_context(const char* name,
-                                      const char *function,
-                                      const char */*file*/,
-                                      int /*line*/)
+                                            const char *function,
+                                            const char */*file*/,
+                                            int /*line*/)
 {
   return new instrmt::itt::RegionContext(name ? name : function);
 }

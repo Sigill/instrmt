@@ -35,8 +35,10 @@ function build_example() {
   info "Using $1"
   ( cd "$2" && cmake \
     -DInstrmt_DIR="$1" \
+    -DTRACY_ROOT=$HERE/vendor/tracy \
+    -DVTUNE_ROOT=$HERE/vendor/ittapi \
     -DCMAKE_CXX_FLAGS=-std=c++11 \
-    "$ROOT/tests/example" && make )
+    "$ROOT/example" && make )
 }
 
 function build_examples() {

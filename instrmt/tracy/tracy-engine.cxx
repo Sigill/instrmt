@@ -1,6 +1,9 @@
-#include "instrmt/instrmt.hxx"
+#include <instrmt/details/base.hxx>
 
+#ifndef TRACY_ENABLE
 #define TRACY_ENABLE
+#endif
+
 #include <TracyC.h>
 
 namespace instrmt {
@@ -29,8 +32,8 @@ public:
 };
 
 Region::Region(const struct ___tracy_source_location_data* srcloc)
-: ::instrmt::Region()
-, tracyctx(___tracy_emit_zone_begin(srcloc, true))
+  : ::instrmt::Region()
+  , tracyctx(___tracy_emit_zone_begin(srcloc, true))
 {}
 
 Region::~Region() {
@@ -38,19 +41,19 @@ Region::~Region() {
 }
 
 RegionContext::RegionContext(const char *name, const char *function, const char *file, int line)
-: ::instrmt::RegionContext()
-, sourceloc{name, function, file, (uint32_t)line, 0}
+  : ::instrmt::RegionContext()
+  , sourceloc{name, function, file, (uint32_t)line, 0}
 {}
 
 } // namespace tracy
-} // namespace telemetry
+} // namespace instrmt
 
 extern "C" {
 
 instrmt::RegionContext* make_region_context(const char* name,
-                                        const char *function,
-                                        const char *file,
-                                        int line)
+                                            const char *function,
+                                            const char *file,
+                                            int line)
 {
   return new instrmt::tracy::RegionContext(name, function, file, line);
 }

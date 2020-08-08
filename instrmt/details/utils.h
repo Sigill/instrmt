@@ -1,0 +1,7 @@
+#ifndef INSTRMTUTILS_H
+#define INSTRMTUTILS_H
+
+#define INSTRMTCONCATIMPL(x,y) x##y
+#define INSTRMTCONCAT(x,y) INSTRMTCONCATIMPL(x,y)
+
+#endif // INSTRMTUTILS_H

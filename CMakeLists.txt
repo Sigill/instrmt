@@ -8,6 +8,13 @@ set(CMAKE_INSTALL_CMAKEDIR "share/cmake" CACHE PATH "Install location for cmake 
 mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
 
 include(CMakePackageConfigHelpers)
+include(CTest)
+
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
+include(instrmt)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set(INSTRMT_EXPORT InstrmtTargets)
 
@@ -16,7 +23,6 @@ function(instrmt_export_install_targets)
         EXPORT ${INSTRMT_EXPORT}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt
         )
 endfunction()
 
@@ -24,79 +30,34 @@ function(instrmt_install_target e)
     install(TARGETS ${e} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endfunction()
 
-add_library(instrmt SHARED instrmt/instrmt.cxx)
+add_library(instrmt SHARED
+    instrmt/details/engine.cxx)
+
+set(INSTRMT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
+
 target_include_directories(instrmt
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    PUBLIC $<BUILD_INTERFACE:${INSTRMT_INCLUDE_DIRS}>
            $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(instrmt PRIVATE dl)
 
-# Define public headers to get them automatically installed.
-set_target_properties(instrmt PROPERTIES
-    PUBLIC_HEADER instrmt/instrmt.hxx)
+if(BUILD_TESTING)
+    add_executable(example-cpp example/example.cpp)
+    target_compile_definitions(example-cpp PRIVATE INSTRMT_ENABLE)
+    target_link_libraries(example-cpp PRIVATE instrmt)
+endif()
+
+install(FILES
+    instrmt/instrmt.hxx
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt)
+
+install(FILES
+    instrmt/details/utils.h
+    instrmt/details/base.hxx
+    instrmt/details/engine.hxx
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt/details)
 
 instrmt_export_install_targets(instrmt)
-
-add_library(instrmt-tty MODULE instrmt/instrmt-tty.cxx)
-target_include_directories(instrmt-tty PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(instrmt-tty PRIVATE instrmt)
-
-instrmt_install_target(instrmt-tty)
-
-option(INSTRMT_BUILD_TRACY_ENGINE "" OFF)
-
-if (INSTRMT_BUILD_TRACY_ENGINE)
-    set(TRACY_ROOT "" CACHE PATH "Root directory of Tracy")
-
-    find_library(TRACY_LIBRARY tracy HINTS $ENV{TRACY_ROOT}/lib ${TRACY_ROOT}/lib)
-    find_path(TRACY_INCLUDE_DIR Tracy.hpp HINTS $ENV{TRACY_ROOT}/include ${TRACY_ROOT}/include)
-    mark_as_advanced(TRACY_LIBRARY TRACY_INCLUDE_DIR)
-
-    if (NOT TRACY_LIBRARY OR NOT TRACY_INCLUDE_DIR)
-        message(FATAL_ERROR "Unable to find Tracy's library, please set TRACY_ROOT")
-    endif()
-
-    add_library(tracy SHARED IMPORTED)
-    set_target_properties(tracy PROPERTIES
-        IMPORTED_LOCATION "${TRACY_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${TRACY_INCLUDE_DIR}"
-        IMPORTED_LINK_INTERFACE_LIBRARIES "dl;pthread"
-        COMPILE_DEFINITIONS TRACY_ENABLE)
-
-    add_library(instrmt-tracy MODULE instrmt/instrmt-tracy.cxx)
-    target_link_libraries(instrmt-tracy PRIVATE instrmt tracy)
-    instrmt_install_target(instrmt-tracy)
-endif()
-
-option(INSTRMT_BUILD_ITT_ENGINE "" OFF)
-if (INSTRMT_BUILD_ITT_ENGINE)
-    set(VTUNE_LIB_SUFFIX "")
-    if(CMAKE_SIZEOF_VOID_P MATCHES "8")
-        set(VTUNE_LIB_DIR "lib64")
-    else()
-        set(VTUNE_LIB_DIR "lib32")
-    endif()
-
-    set(VTUNE_ROOT /opt/intel/vtune_profiler CACHE PATH "Root directory of VTune's profiler")
-
-    find_library(ITTNOTIFY_LIBRARY ittnotify HINTS $ENV{VTUNE_ROOT}/${VTUNE_LIB_DIR} ${VTUNE_ROOT}/${VTUNE_LIB_DIR})
-    find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS $ENV{VTUNE_ROOT}/include ${VTUNE_ROOT}/include)
-    mark_as_advanced(ITTNOTIFY_LIBRARY ITTNOTIFY_INCLUDE_DIR)
-
-    if (NOT ITTNOTIFY_LIBRARY OR NOT ITTNOTIFY_INCLUDE_DIR)
-        message(FATAL_ERROR "Unable to find ittnotify library, please set VTUNE_ROOT")
-    endif()
-
-    add_library(ittnotify SHARED IMPORTED)
-    set_target_properties(ittnotify PROPERTIES
-        IMPORTED_LOCATION "${ITTNOTIFY_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${ITTNOTIFY_INCLUDE_DIR}"
-        IMPORTED_LINK_INTERFACE_LIBRARIES "dl;pthread")
-
-    add_library(instrmt-itt MODULE instrmt/instrmt-itt.cxx)
-    target_link_libraries(instrmt-itt PRIVATE instrmt ittnotify)
-    instrmt_install_target(instrmt-itt)
-endif()
 
 # Create the export file for the build tree.
 export(TARGETS instrmt FILE "${PROJECT_BINARY_DIR}/${INSTRMT_EXPORT}.cmake")
@@ -114,7 +75,7 @@ configure_file(InstrmtConfig.in.cmake
     "${PROJECT_BINARY_DIR}/InstrmtConfig.cmake" @ONLY)
 
 # Create the config file for the install tree.
-set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
+set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/../../${CMAKE_INSTALL_INCLUDEDIR}")
 configure_file(InstrmtConfig.in.cmake
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake" @ONLY)
 
@@ -129,3 +90,11 @@ install(FILES
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/InstrmtConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
+
+add_subdirectory(instrmt/tty)
+
+option(INSTRMT_BUILD_TRACY_ENGINE "" OFF)
+add_subdirectory(instrmt/tracy)
+
+option(INSTRMT_BUILD_ITT_ENGINE "" OFF)
+add_subdirectory(instrmt/itt)
