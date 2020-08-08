@@ -1,0 +1,14 @@
+language: cpp
+os: linux
+dist: bionic
+compiler: gcc
+cache:
+  directories:
+    - vendor/cmake2.8
+install:
+  # vendor/cmake2.8 will be created even if there's nothing in the cache, preventing the build.
+  # if empty, delete it
+  - rmdir --ignore-fail-on-non-empty vendor/cmake2.8
+  - ./vendor/fetch_prerequisites.sh --ittapi --tracy --cmake2 --cmake3
+script:
+  - ./tests/integration-tests.sh
