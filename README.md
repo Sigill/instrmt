@@ -78,9 +78,14 @@ To use a wrapper:
 
 - Include `instrmt/instrmt.hxx` and markup your code.
 - Make sure your compiler can locate that include.
+- Add the following define: `INSTRMT_CXX_WRAPPER=\"instrmt/*/*-wrapper.hxx\"`.
 - Import the underlying library as usual (Instrmt is just a wrapper, your compiler needs to find its includes and link against it).
 
-See the `use_*_wrapper()` macros in `cmake/instrmt.cmake` for examples on how to do it with CMake.
+e.g.:
+
+`g++ main.cpp -I/path/to/instrmt/include -I/path/to/ittnotify/include -DINSTRMT_CXX_WRAPPER=\"instrmt/itt/itt-wrapper.hxx\" -L/path/to/ittnotify/lib littnotify -lpthread -ldl -o main`
+
+See the `use_*_wrapper()` macros in `cmake/instrmt.cmake` for examples using CMake.
 
 ## License
 
