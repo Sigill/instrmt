@@ -3,12 +3,35 @@
 export ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && cd .. && pwd )"
 export HERE="$PWD"
 
+PRETTY=
+test -t 1 && PRETTY=color
+RES_COL=60
+MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+SETCOLOR_FAILURE="echo -en \\033[1;31m"
+SETCOLOR_ELLIPSIS="echo -en \\033[1;34m"
+SETCOLOR_WARNING="echo -en \\033[1;33m"
+SETCOLOR_NORMAL="echo -en \\033[0;39m"
+
 function OK() {
-  echo -e "\e[5;7;32mOK\e[0m"
+  [ -n "$PRETTY" ] && $MOVE_TO_COL
+  echo -n "["
+  [ -n "$PRETTY" ] && $SETCOLOR_SUCCESS
+  echo -n $"  OK  "
+  [ -n "$PRETTY" ] && $SETCOLOR_NORMAL
+  echo "]"
+  return 0
 }
 
 function KO() {
-  echo -e "\e[5;7;31mOK\e[0m"
+  [ -n "$PRETTY" ] && $MOVE_TO_COL
+  echo -n "["
+  [ -n "$PRETTY" ] && $SETCOLOR_FAILURE
+  echo -n $"FAILED"
+  [ -n "$PRETTY" ] && $SETCOLOR_NORMAL
+  echo "]"
+  [ $# -eq 1 ] && eval $1=1
+  return 1
 }
 
 function info() {
@@ -28,7 +51,7 @@ function build_instrmt() {
     -DCMAKE_CXX_FLAGS=-std=c++11 \
     -DCMAKE_INSTALL_PREFIX=$2 \
     -DCMAKE_BUILD_TYPE=Release \
-    $ROOT && make install )
+    $ROOT && make -j$(nproc) install )
 }
 
 function build_example() {
@@ -38,16 +61,20 @@ function build_example() {
     -DTRACY_ROOT=$HERE/vendor/tracy \
     -DVTUNE_ROOT=$HERE/vendor/ittapi \
     -DCMAKE_CXX_FLAGS=-std=c++11 \
-    "$ROOT/example" && make )
+    "$ROOT/example" && make -j$(nproc) )
 }
 
 function build_examples() {
+  local status=0
+
   info "$(cmake_version)"
-  build_instrmt $HERE/$1/instrmt/build $HERE/$1/instrmt/dist &&
+  build_instrmt $HERE/$1/instrmt/build $HERE/$1/instrmt/dist || KO status && OK &&
   {
-    build_example $HERE/$1/instrmt/build $HERE/$1/example-build && OK || KO
-    build_example $HERE/$1/instrmt/dist/share/cmake $HERE/$1/example-dist && OK || KO
+    build_example $HERE/$1/instrmt/build $HERE/$1/example-build || KO status && OK
+    build_example $HERE/$1/instrmt/dist/share/cmake $HERE/$1/example-dist || KO status && OK
   }
+
+  return $status
 }
 
 mkdir -p 2.8/example-build 2.8/example-dist 3/example-build 3/example-dist

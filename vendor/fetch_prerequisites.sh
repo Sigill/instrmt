@@ -202,11 +202,11 @@ while (( "$#" )); do
   shift
 done
 
-[ -n "$build_cmake2" ] && { install_cmake2 || exit -1 ; }
-[ -n "$build_cmake3" ] && { install_cmake3 || exit -1 ; }
-[ -n "$build_ittapi" ] && { install_ittapi || exit -1 ; }
-[ -n "$build_capstone" ] && { install_capstone || exit -1 ; }
-[ -n "$build_glfw" ] && { install_glfw || exit -1 ; }
-[ -n "$build_tracylib" -o -n "$build_tracycapture" -o -n "$build_tracyprofiler" ] && { install_tracy || exit -1 ; }
+[ -z "$build_cmake2" ] || install_cmake2 || exit -1
+[ -z "$build_cmake3" ] || install_cmake3 || exit -1
+[ -z "$build_ittapi" ] || install_ittapi || exit -1
+[ -z "$build_capstone" ] || install_capstone || exit -1
+[ -z "$build_glfw" ] || install_glfw || exit -1
+[ -z "$build_tracylib" -a -z "$build_tracycapture" -a -z "$build_tracyprofiler" ] || install_tracy || exit -1
 
 exit 0
