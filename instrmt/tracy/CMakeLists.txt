@@ -1,6 +1,4 @@
 if (INSTRMT_BUILD_TRACY_ENGINE)
-    find_tracy()
-
     add_library(instrmt-tracy MODULE tracy-engine.cxx)
     target_link_libraries(instrmt-tracy PRIVATE instrmt tracy)
     instrmt_install_target(instrmt-tracy)

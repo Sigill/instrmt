@@ -11,8 +11,6 @@ namespace itt {
 
 class Region : public instrmt::Region {
 protected:
-  bool live = true;
-
   __itt_string_handle *name;
   __itt_id m_id = __itt_null;
 
@@ -48,10 +46,7 @@ Region::Region(__itt_string_handle *pName)
 
 Region::~Region()
 {
-  if (live) {
-    __itt_task_end(instrmt_domain);
-    live = false;
-  }
+  __itt_task_end(instrmt_domain);
 }
 
 } // namespace itt
@@ -60,8 +55,8 @@ Region::~Region()
 extern "C" {
 
 instrmt::RegionContext* make_region_context(const char* name,
-                                            const char *function,
-                                            const char */*file*/,
+                                            const char* function,
+                                            const char* /*file*/,
                                             int /*line*/)
 {
   return new instrmt::itt::RegionContext(name ? name : function);

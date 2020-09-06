@@ -1,15 +1,28 @@
 #include <instrmt/instrmt.hxx>
 
+#include <thread>
+#include <chrono>
+
+using namespace std::chrono_literals;
+
 void f() {
   {
     INSTRMT_REGION("f1");
 
+    std::this_thread::sleep_for(10ms);
+
     INSTRMT_NAMED_REGION(f2, "f2");
+
+    std::this_thread::sleep_for(10ms);
   }
 
   INSTRMT_REGION_BEGIN("f3");
 
+  std::this_thread::sleep_for(10ms);
+
   INSTRMT_NAMED_REGION_BEGIN(f4, "f4");
+
+  std::this_thread::sleep_for(10ms);
 
   INSTRMT_NAMED_REGION_END(f4);
 

@@ -1,6 +1,4 @@
 if (INSTRMT_BUILD_ITT_ENGINE)
-    find_itt()
-
     add_library(instrmt-itt MODULE itt-engine.cxx)
     target_link_libraries(instrmt-itt PRIVATE instrmt ittnotify)
     instrmt_install_target(instrmt-itt)

@@ -26,16 +26,15 @@ function(find_itt)
     endif()
 
     set(VTUNE_ROOT /opt/intel/vtune_profiler CACHE PATH "Root directory of VTune's profiler")
-
-    find_library(ITTNOTIFY_LIBRARY ittnotify HINTS $ENV{VTUNE_ROOT}/${VTUNE_LIB_DIR} ${VTUNE_ROOT}/${VTUNE_LIB_DIR})
-    find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS $ENV{VTUNE_ROOT}/include ${VTUNE_ROOT}/include)
+    find_library(ITTNOTIFY_LIBRARY ittnotify HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES ${VTUNE_LIB_DIR})
+    find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES include)
     mark_as_advanced(ITTNOTIFY_LIBRARY ITTNOTIFY_INCLUDE_DIR)
 
     if (NOT ITTNOTIFY_LIBRARY OR NOT ITTNOTIFY_INCLUDE_DIR)
         message(FATAL_ERROR "Unable to find ittnotify library, please set VTUNE_ROOT")
     endif()
 
-    add_library(ittnotify SHARED IMPORTED)
+    add_library(ittnotify STATIC IMPORTED)
     set_target_properties(ittnotify PROPERTIES
         IMPORTED_LOCATION "${ITTNOTIFY_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${ITTNOTIFY_INCLUDE_DIR}"

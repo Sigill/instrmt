@@ -13,6 +13,11 @@ SETCOLOR_ELLIPSIS="echo -en \\033[1;34m"
 SETCOLOR_WARNING="echo -en \\033[1;33m"
 SETCOLOR_NORMAL="echo -en \\033[0;39m"
 
+function cmd() {
+  echo "$@"
+  "$@"
+}
+
 function OK() {
   [ -n "$PRETTY" ] && $MOVE_TO_COL
   echo -n "["
@@ -43,12 +48,12 @@ function cmake_version() {
 }
 
 function build_instrmt() {
-   [ -d $2 ] || ( mkdir -p "$1" && cd "$1" && cmake \
+   [ -d $2 ] || ( mkdir -p "$1" && cd "$1" && cmd cmake \
     -DINSTRMT_BUILD_TRACY_ENGINE=ON \
     -DINSTRMT_BUILD_ITT_ENGINE=ON \
     -DTRACY_ROOT=$HERE/vendor/tracy \
     -DVTUNE_ROOT=$HERE/vendor/ittapi \
-    -DCMAKE_CXX_FLAGS=-std=c++11 \
+    -DCMAKE_CXX_FLAGS=-std=c++14 \
     -DCMAKE_INSTALL_PREFIX=$2 \
     -DCMAKE_BUILD_TYPE=Release \
     $ROOT && make -j$(nproc) install )
@@ -56,11 +61,11 @@ function build_instrmt() {
 
 function build_example() {
   info "Using $1"
-  ( cd "$2" && cmake \
+  ( cd "$2" && cmd cmake \
     -DInstrmt_DIR="$1" \
     -DTRACY_ROOT=$HERE/vendor/tracy \
     -DVTUNE_ROOT=$HERE/vendor/ittapi \
-    -DCMAKE_CXX_FLAGS=-std=c++11 \
+    -DCMAKE_CXX_FLAGS=-std=c++14 \
     "$ROOT/example" && make -j$(nproc) )
 }
 

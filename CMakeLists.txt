@@ -94,7 +94,18 @@ install(FILES
 add_subdirectory(instrmt/tty)
 
 option(INSTRMT_BUILD_TRACY_ENGINE "" OFF)
+if (INSTRMT_BUILD_TRACY_ENGINE)
+    find_tracy()
+endif()
 add_subdirectory(instrmt/tracy)
 
 option(INSTRMT_BUILD_ITT_ENGINE "" OFF)
+if (INSTRMT_BUILD_ITT_ENGINE)
+    find_itt()
+endif()
 add_subdirectory(instrmt/itt)
+
+option(BUILD_BENCHMARKS "" OFF)
+if (BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
