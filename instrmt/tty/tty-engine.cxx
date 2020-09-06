@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <string>
-#include <atomic>
 
 #include <instrmt/tty/tty-utils.h>
 
@@ -14,7 +13,6 @@ private:
   const char* name;
   double start;
   int color;
-  bool live = true;
 
 public:
   explicit Region(const char* name, int color);
@@ -41,10 +39,7 @@ Region::Region(const char* name, int color)
 
 Region::~Region()
 {
-  if (live) {
-    live = false;
-    printf("\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
-  }
+  fprintf(stderr, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
 }
 
 RegionContext::RegionContext(const char* name)

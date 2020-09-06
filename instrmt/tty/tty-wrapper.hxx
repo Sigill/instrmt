@@ -28,7 +28,7 @@ public:
   inline void terminate() {
     if (live) {
       live = false;
-      printf("\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", ctx.color, ctx.name, instrmt_get_time_ms() - start);
+      fprintf(stderr, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", ctx.color, ctx.name, instrmt_get_time_ms() - start);
     }
   }
 
