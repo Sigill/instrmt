@@ -107,6 +107,20 @@ function install_glfw() {
   }
 }
 
+function install_gtk() {
+  export gtk_ver=3.24.23
+  export gtk_tar=$HERE/vendor/tmp/gtk+-$gtk_ver.tar.xz
+  export gtk_src=$HERE/vendor/tmp/gtk+-$gtk_ver-src
+  export gtk_dep=$HERE/vendor/gtk
+
+  [ -d $gtk_dep ] || {
+    [ -d $gtk_src ] || {
+      download https://download.gnome.org/sources/gtk+/${gtk_ver%.*}/gtk+-$gtk_ver.tar.xz $gtk_tar fb383236280fb272ad5eb819f80ceb17 &&
+      extract $gtk_tar $gtk_src
+    } && ( cd $gtk_src && ./configure --prefix=$gtk_dep && make -j$(nproc) install )
+  }
+}
+
 function install_tracy() {
   export tracy_ver=0.7.2
   export tracy_tar=$HERE/vendor/tmp/tracy-$tracy_ver.tar.gz
@@ -153,6 +167,7 @@ build_cmake3=
 build_ittapi=
 build_capstone=
 build_glfw=
+build_gtk=
 build_tracylib=
 build_tracycapture=
 build_tracyprofiler=
@@ -175,6 +190,9 @@ while (( "$#" )); do
       ;;
     --glfw)
       build_glfw=1
+      ;;
+    --gtk)
+      build_gtk=1
       ;;
     --tracy)
       build_tracylib=1
@@ -200,6 +218,7 @@ done
 [ -z "$build_ittapi" ] || install_ittapi || exit -1
 [ -z "$build_capstone" ] || install_capstone || exit -1
 [ -z "$build_glfw" ] || install_glfw || exit -1
+[ -z "$build_gtk" ] || install_gtk || exit -1
 [ -z "$build_tracylib" -a -z "$build_tracycapture" -a -z "$build_tracyprofiler" ] || install_tracy || exit -1
 
 exit 0
