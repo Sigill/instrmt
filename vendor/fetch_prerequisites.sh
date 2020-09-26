@@ -1,22 +1,15 @@
 #!/bin/bash
 
 function check_md5() {
-  echo $2 $1 > $1.md5
-  md5sum -c $1.md5
+  echo "$2 *$1" | md5sum -c
 }
-
 
 function download() {
-  wget -q --no-check-certificate $1 -O "$2" &&
-  check_md5 "$2" $3
-}
-
-function download_github() {
-  download https://github.com/$1 "$2" $3
+  [ -f "$2" ] || wget -q --no-check-certificate $1 -O "$2" && check_md5 "$2" "$3"
 }
 
 function extract() {
-  mkdir -p $2 && tar -xzf $1 --strip-components=1 -C $2
+  mkdir -p "$2" && tar -xf "$1" --strip-components=1 -C "$2"
 }
 
 export ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && cd .. && pwd )"
@@ -34,8 +27,8 @@ function install_cmake2() {
   [ -d $cmake2_dep ] || {
     [ -d $cmake2_bld ] || {
       [ -d $cmake2_src ] || {
-        [ -f $cmake2_tar ] || download_github Kitware/CMake/archive/v2.8.12.tar.gz $cmake2_tar 0dc2118e56f5c02dc5a90be9bd19befc &&
-        extract $cmake2_tar $cmake2_src && patch -p1 -d $cmake2_src < "$ROOT/vendor/cmake2812-noqt.diff"
+        download https://github.com/Kitware/CMake/archive/v2.8.12.tar.gz $cmake2_tar 0dc2118e56f5c02dc5a90be9bd19befc &&
+        extract $cmake2_tar $cmake2_src && patch -p1 -d $cmake2_src -i "$ROOT/vendor/cmake2812-noqt.diff"
       } && ( mkdir -p $cmake2_bld && cd $cmake2_bld && $cmake2_src/bootstrap --parallel=$(nproc) --no-qt-gui --prefix=$cmake2_dep )
     } && make -C $cmake2_bld -j$(nproc) install
   }
@@ -48,8 +41,8 @@ function install_cmake3() {
   export cmake3_dep=$HERE/vendor/cmake3
 
   [ -d $cmake3_dep ] || {
-    [ -f $cmake3_tar ] || download_github Kitware/CMake/releases/download/v$cmake3_ver/cmake-$cmake3_ver-Linux-x86_64.tar.gz $cmake3_tar b777a4cb358153dc9b172ebf49426da0 &&
-    mkdir -p $cmake3_dep && tar -xzf $cmake3_tar --strip-components=1 -C $cmake3_dep
+    download https://github.com/Kitware/CMake/releases/download/v$cmake3_ver/cmake-$cmake3_ver-Linux-x86_64.tar.gz $cmake3_tar b777a4cb358153dc9b172ebf49426da0 &&
+    extract $cmake3_tar $cmake3_dep
   }
 }
 
@@ -64,7 +57,7 @@ function install_ittapi() {
   [ -d $ittapi_dep ] || {
     [ -d $ittapi_bld ] || {
       [ -d $ittapi_src ] || {
-        [ -f $ittapi_tar ] || download_github intel/ittapi/archive/$ittapi_tag.tar.gz $ittapi_tar 5920c512a7a7c8971f2ffe6f693ffff3 &&
+        download https://github.com/intel/ittapi/archive/$ittapi_tag.tar.gz $ittapi_tar 5920c512a7a7c8971f2ffe6f693ffff3 &&
         extract $ittapi_tar $ittapi_src
       } && ( mkdir -p $ittapi_bld && cd $ittapi_bld && cmake -DCMAKE_BUILD_TYPE=Release $ittapi_src )
     } && {
@@ -87,8 +80,8 @@ function install_capstone() {
   [ -d $capstone_dep ] || {
     [ -d $capstone_bld ] || {
       [ -d $capstone_src ] || {
-        [ -f $capstone_tar ] || download_github aquynh/capstone/archive/$capstone_ver.tar.gz $capstone_tar 8894344c966a948f1248e66c91b53e2c &&
-        extract $capstone_tar $capstone_src && patch -p1 -d $capstone_src < "$ROOT/vendor/capstone-pkgconfig-includedir.diff"
+        download https://github.com/aquynh/capstone/archive/$capstone_ver.tar.gz $capstone_tar 8894344c966a948f1248e66c91b53e2c &&
+        extract $capstone_tar $capstone_src && patch -p1 -d $capstone_src -i "$ROOT/vendor/capstone-pkgconfig-includedir.diff"
       } && ( mkdir -p $capstone_bld && cd $capstone_bld && cmake -DCMAKE_INSTALL_PREFIX=$capstone_dep -DCMAKE_BUILD_TYPE=Release $capstone_src )
     } &&
     make -C $capstone_bld -j$(nproc) install &&
@@ -107,15 +100,14 @@ function install_glfw() {
   [ -d $glfw_dep ] || {
     [ -d $glfw_bld ] || {
       [ -d $glfw_src ] || {
-        [ -f $glfw_tar ] || download_github glfw/glfw/archive/3.3.2.tar.gz $glfw_tar 865e54ff0a100e9041a40429db98be0b &&
+        download https://github.com/glfw/glfw/archive/3.3.2.tar.gz $glfw_tar 865e54ff0a100e9041a40429db98be0b &&
         extract $glfw_tar $glfw_src
       } && ( mkdir -p $glfw_bld && cd $glfw_bld && cmake -DCMAKE_INSTALL_PREFIX=$glfw_dep -DCMAKE_BUILD_TYPE=Release $glfw_src )
     } && make -C $glfw_bld -j$(nproc) install
   }
 }
 
-function install_tracy() {
-  export tracy_ver=0.7
+function install_tracy_version() {
   export tracy_tar=$HERE/vendor/tmp/tracy-$tracy_ver.tar.gz
   export tracy_src=$HERE/vendor/tmp/tracy-$tracy_ver-src
   export tracy_dep=$HERE/vendor/tracy
@@ -129,30 +121,51 @@ function install_tracy() {
 
   [ -z "$build_tracylib" -a -z "$build_tracycapture" -a -z "$build_tracyprofiler" ] || {
     [ -d $tracy_src ] || {
-      [ -f $tracy_tar ] || download_github wolfpld/tracy/archive/v$tracy_ver.tar.gz $tracy_tar f00e6ca9f5e0858580d6546afce35a03 &&
-      extract $tracy_tar $tracy_src && patch -p1 -d $tracy_src < "$ROOT/vendor/tracy-pkgconfig-static.diff"
+      download https://github.com/wolfpld/tracy/archive/v$tracy_ver.tar.gz $tracy_tar $tracy_md5 &&
+      extract $tracy_tar $tracy_src && patch -p1 -d $tracy_src -i "$ROOT/vendor/tracy-pkgconfig-static.diff"
     } &&
     {
       [ -z $build_tracylib ] || {
         mkdir -p $tracy_dep/lib $tracy_dep/include &&
-        make -C $tracy_src/library/unix release
+        make -C $tracy_src/library/unix -j$(nproc) release
         cp $tracy_src/library/unix/libtracy-release.so $tracy_library &&
         cp -r $tracy_src/*.h $tracy_src/*.hpp $tracy_src/client $tracy_src/common $tracy_dep/include/
       }
     } && {
       [ -z $build_tracycapture ] || {
         mkdir -p $tracy_dep/bin &&
-        make -C $tracy_src/capture/build/unix release &&
+        PKG_CONFIG_PATH=$HERE/vendor/capstone/lib/pkgconfig make -C $tracy_src/capture/build/unix -j$(nproc) release &&
         cp $tracy_src/capture/build/unix/capture-release $tracy_capture
       }
     } && {
       [ -z $build_tracyprofiler ] || {
         mkdir -p $tracy_dep/bin &&
-        PKG_CONFIG_PATH=$HERE/vendor/capstone/lib/pkgconfig:$HERE/vendor/glfw/lib/pkgconfig:$PKG_CONFIG_PATH make -C $tracy_src/profiler/build/unix release &&
+        PKG_CONFIG_PATH=$HERE/vendor/capstone/lib/pkgconfig:$HERE/vendor/glfw/lib/pkgconfig:$PKG_CONFIG_PATH make -C $tracy_src/profiler/build/unix -j$(nproc) release &&
         cp $tracy_src/profiler/build/unix/Tracy-release $tracy_profiler
       }
     }
   }
+}
+
+function install_tracy() {
+  if [ -z "$tracy_ver" ]; then
+    export tracy_ver=0.7.2
+  fi
+
+  case "$tracy_ver" in
+    0.7)
+      export tracy_md5=f00e6ca9f5e0858580d6546afce35a03
+      ;;
+    0.7.2)
+      export tracy_md5=bceb615c494c3f7ccb77ba3bae20b216
+      ;;
+    *)
+      2> echo "Unsupported tracy version: $tracy_ver"
+      exit -1
+      ;;
+  esac
+
+  install_tracy_version
 }
 
 build_cmake2=
