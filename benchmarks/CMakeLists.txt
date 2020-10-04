@@ -10,6 +10,16 @@ target_link_libraries(instrmt-benchmarks PRIVATE benchmark::benchmark benchmark:
 target_link_libraries(instrmt-benchmarks PRIVATE instrmt)
 target_include_directories(instrmt-benchmarks PRIVATE .)
 
+add_executable(instrmt-benchmarks-disable
+    instrmt-benchmarks.cxx
+    instrmt-benchmarks-functions.cxx
+    instrmt-benchmarks-functions2.cxx)
+
+target_compile_definitions(instrmt-benchmarks-disable PRIVATE INSTRMT_DISABLE)
+target_link_libraries(instrmt-benchmarks-disable PRIVATE benchmark::benchmark benchmark::benchmark_main)
+target_link_libraries(instrmt-benchmarks-disable PRIVATE instrmt)
+target_include_directories(instrmt-benchmarks-disable PRIVATE .)
+
 
 add_executable(instrmt-benchmarks-tty
     instrmt-benchmarks.cxx

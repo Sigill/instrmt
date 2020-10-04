@@ -33,6 +33,17 @@
 #define INSTRMT_FUNCTION() \
   INSTRMT_NAMED_REGION(_, nullptr)
 
+#define INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG) \
+  static const std::unique_ptr<::instrmt::LiteralMessageContext> INSTRMTCONCAT(VAR, _instrmt_msg_ctx) = \
+    ::instrmt::make_literal_message_context(MSG); \
+  if (INSTRMTCONCAT(VAR, _instrmt_msg_ctx)) INSTRMTCONCAT(VAR, _instrmt_msg_ctx)->emit_message()
+
+#define INSTRMT_LITERAL_MESSAGE(MSG) \
+  INSTRMT_NAMED_LITERAL_MESSAGE(_, MSG)
+
+#define INSTRMT_MESSAGE(MSG) \
+  ::instrmt::emit_message(MSG)
+
 #endif // INSTRMT_CXX_WRAPPER
 
 #else // INSTRMT_DISABLE
@@ -46,6 +57,12 @@
 #define INSTRMT_REGION_END()
 
 #define INSTRMT_FUNCTION()
+
+#define INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG)
+
+#define INSTRMT_LITERAL_MESSAGE(MSG)
+
+#define INSTRMT_MESSAGE(MSG)
 
 #endif // INSTRMT_DISABLE
 

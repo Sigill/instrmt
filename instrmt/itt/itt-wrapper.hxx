@@ -7,13 +7,13 @@
 
 static const __itt_domain* __itt_domain_name = __itt_domain_create("instrmt");
 
-class ITTTask
+class InstrmtITTRegion
 {
 private:
   bool live = true;
 
 public:
-  inline explicit ITTTask(__itt_string_handle* pName) {
+  inline explicit InstrmtITTRegion(__itt_string_handle* pName) {
     __itt_task_begin(__itt_domain_name, __itt_null, __itt_null, pName);
   }
 
@@ -24,14 +24,14 @@ public:
     }
   }
 
-  inline ~ITTTask() {
+  inline ~InstrmtITTRegion() {
     terminate();
   }
 };
 
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
   static __itt_string_handle* INSTRMTCONCAT(VAR, _itt_region_name) = __itt_string_handle_create(NAME); \
-  ITTTask INSTRMTCONCAT(VAR, _itt_region) ( INSTRMTCONCAT(VAR, _itt_region_name) )
+  InstrmtITTRegion INSTRMTCONCAT(VAR, _itt_region) ( INSTRMTCONCAT(VAR, _itt_region_name) )
 
 #define INSTRMT_NAMED_REGION_BEGIN(VAR, NAME) INSTRMT_NAMED_REGION(VAR, NAME)
 
@@ -44,5 +44,15 @@ public:
 #define INSTRMT_REGION_END() INSTRMT_NAMED_REGION_END(_)
 
 #define INSTRMT_FUNCTION() INSTRMT_NAMED_REGION(_, __FUNCTION__)
+
+#define INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG) \
+  static __itt_string_handle* INSTRMTCONCAT(VAR, _itt_message) = __itt_string_handle_create(MSG); \
+  __itt_marker(__itt_domain_name, __itt_null, INSTRMTCONCAT(VAR, _itt_message), __itt_scope_track_group)
+
+#define INSTRMT_LITERAL_MESSAGE(MSG) \
+  INSTRMT_NAMED_LITERAL_MESSAGE(_, MSG)
+
+#define INSTRMT_MESSAGE(MSG) \
+  __itt_marker(__itt_domain_name, __itt_null, __itt_string_handle_create(MSG), __itt_scope_track_group)
 
 #endif // INSTRMTITTWRAPPER_HXX

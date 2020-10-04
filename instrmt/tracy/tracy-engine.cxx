@@ -5,6 +5,7 @@
 #endif
 
 #include <TracyC.h>
+#include <cstring>
 
 namespace instrmt {
 namespace tracy {
@@ -45,6 +46,21 @@ RegionContext::RegionContext(const char *name, const char *function, const char 
   , sourceloc{name, function, file, (uint32_t)line, 0}
 {}
 
+class LiteralMessageContext : public instrmt::LiteralMessageContext {
+private:
+  const char* msg;
+
+public:
+  explicit LiteralMessageContext(const char* msg)
+    : instrmt::LiteralMessageContext ()
+    , msg(msg)
+  {}
+
+  void emit_message() const override {
+    ___tracy_emit_messageL(msg, 0);
+  }
+};
+
 } // namespace tracy
 } // namespace instrmt
 
@@ -56,6 +72,16 @@ instrmt::RegionContext* make_region_context(const char* name,
                                             int line)
 {
   return new instrmt::tracy::RegionContext(name, function, file, line);
+}
+
+::instrmt::LiteralMessageContext* make_literal_message_context(const char* msg)
+{
+  return new instrmt::tracy::LiteralMessageContext(msg);
+}
+
+void instrmt_dynamic_message(const char* msg)
+{
+  ___tracy_emit_message(msg, strlen(msg), 0);
 }
 
 } // extern C

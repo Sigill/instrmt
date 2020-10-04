@@ -3,6 +3,8 @@
 
 #include <TracyC.h>
 
+#include <cstring>
+
 class InstrmtTracyRegion {
 private:
   TracyCZoneCtx tracyctx;
@@ -25,6 +27,11 @@ public:
   }
 };
 
+inline void instrmt_tracy_emit_message(const char* msg)
+{
+  ___tracy_emit_message(msg, strlen(msg), 0);
+}
+
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
   static const struct ___tracy_source_location_data TracyConcat(VAR, _tracy_source_location) = { NAME, __FUNCTION__,  __FILE__, (uint32_t)__LINE__, 0 }; \
   InstrmtTracyRegion TracyConcat(VAR, _tracy_region)(&TracyConcat(VAR, _tracy_source_location))
@@ -40,5 +47,14 @@ public:
 #define INSTRMT_REGION_END() INSTRMT_NAMED_REGION_END(_)
 
 #define INSTRMT_FUNCTION() INSTRMT_NAMED_REGION(_, (char*)0)
+
+#define INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG) \
+  ___tracy_emit_messageL(MSG, 0);
+
+#define INSTRMT_LITERAL_MESSAGE(MSG) \
+  INSTRMT_NAMED_LITERAL_MESSAGE(_, MSG)
+
+#define INSTRMT_MESSAGE(MSG) \
+  instrmt_tracy_emit_message(MSG);
 
 #endif // INSTRMTTRACYWRAPPER_HXX

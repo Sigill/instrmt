@@ -1,26 +1,44 @@
 #!/bin/bash
 
-rm -f instrmt-benchmarks-functions.hxx instrmt-benchmarks-functions.cxx
-rm -f instrmt-benchmarks-functions2.hxx instrmt-benchmarks-functions2.cxx
+function printf_n()
+{
+  local i
+  for i in $(seq 1 $1) ; do
+    printf "$2\n" $i
+  done
+}
 
-echo "#include <instrmt/instrmt.hxx>" > instrmt-benchmarks-functions.cxx
+{
+  printf_n 1000 "void f%d();"
+  printf_n 1000 "void lm%d();"
+  printf_n 1000 "void m%d();"
+} > instrmt-benchmarks-functions.hxx
 
-echo "void instrmt1000();" >> instrmt-benchmarks-functions2.hxx
+{
+  echo "#include <instrmt/instrmt.hxx>"
+  printf_n 1000 "void f%d() { INSTRMT_FUNCTION(); }"
+  printf_n 1000 "void lm%d() { INSTRMT_LITERAL_MESSAGE(__FUNCTION__); }"
+  printf_n 1000 "void m%d() { INSTRMT_MESSAGE(__FUNCTION__); }"
+} > instrmt-benchmarks-functions.cxx
 
-cat >> instrmt-benchmarks-functions2.cxx <<EOL
-#include <instrmt-benchmarks-functions.hxx>
+{
+  echo "void function1000();"
+  echo "void lmessage1000();"
+  echo "void message1000();"
+} > instrmt-benchmarks-functions2.hxx
 
-void instrmt1000() {
-EOL
+{
+  echo "#include <instrmt-benchmarks-functions.hxx>"
+  echo
+  echo "void function1000() {"
+  printf_n 1000 "  f%d();"
+  echo "}"
 
-for i in {1..1000} ; do
-  echo "void f$i();" >> instrmt-benchmarks-functions.hxx
+  echo "void lmessage1000() {"
+  printf_n 1000 "  lm%d();"
+  echo "}"
 
-  cat >> instrmt-benchmarks-functions.cxx <<EOL
-void f$i() { INSTRMT_FUNCTION(); }
-EOL
-
-  echo "  f$i();" >> instrmt-benchmarks-functions2.cxx
-done
-
-echo "}" >> instrmt-benchmarks-functions2.cxx
+  echo "void message1000() {"
+  printf_n 1000 "  m%d();"
+  echo "}"
+} > instrmt-benchmarks-functions2.cxx

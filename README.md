@@ -8,13 +8,15 @@ It currently supports three "instrumentation engines":
 - _itt_: [Intel ITT API](https://software.intel.com/content/www/us/en/develop/articles/intel-itt-api-open-source.html), for VTune or [Intel SEAPI](https://github.com/intel/IntelSEAPI).
 - _tracy_: [Tracy profiler](https://github.com/wolfpld/tracy).
 
-## Region markup
+## API
 
-The following macros (defined in `instrmt/instrmt.hxx`) let you markup the start and end of a block of code to instrument.
+All of Instrmt C++ API is defined by macros in `instrmt/instrmt.hxx`.
 
-Regions are similar to Intel's *Tasks* or Tracy's *Zones*.
+### Region markup
 
-The following macros use RAII to bind end of of a region to the scope of the underlying variables.
+A region define the start and end of a block of code (regions are similar to Intel's *Tasks* or Tracy's *Zones*).
+
+The following macros use RAII to bind the end of a region to the scope of the underlying variables.
 
 - `INSTRMT_FUNCTION()`: instrument the current scope, using the name of the function.
 
@@ -29,6 +31,18 @@ If you cannot relies on RAII, use the following macros to manually markup the st
 - `INSTRMT_NAMED_REGION_BEGIN(VAR)`, `INSTRMT_NAMED_REGION_END(VAR)`
 
 For performance reasons, `NAME` must be a string literal.
+
+### Messages
+
+Messages allow you to log arbitrary events to help you navigate through a program's trace.
+
+The following macros are available:
+
+- `INSTRMT_LITERAL_MESSAGE(MSG)`, `INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG)` for string literals.
+
+- `INSTRMT_MESSAGE(MSG)` for arbitrary strings.
+
+Note: Despite having an API for messages, VTune does not support them.
 
 ## Usage
 

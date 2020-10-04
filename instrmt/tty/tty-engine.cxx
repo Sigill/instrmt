@@ -2,8 +2,25 @@
 
 #include <stdio.h>
 #include <string>
+//#include <atomic>
 
 #include <instrmt/tty/tty-utils.h>
+
+//namespace {
+
+//typedef struct {
+//  const char* name;
+//  int color;
+//} TTYCRegionContext;
+
+//TTYCRegionContext contexts[1000];
+
+//typedef struct {
+//  TTYCRegionContext* ctx;
+//  double start;
+//} TTYCRegion;
+
+//} // anonymous namespace
 
 namespace instrmt {
 namespace tty {
@@ -53,6 +70,23 @@ Region*RegionContext::make_region_ptr()
   return new Region(name, color);
 }
 
+class LiteralMessageContext : public instrmt::LiteralMessageContext {
+private:
+  const char* msg;
+  int color;
+
+public:
+  explicit LiteralMessageContext(const char* msg)
+    : instrmt::LiteralMessageContext ()
+    , msg(msg)
+    , color(instrmt_tty_string_color(msg))
+  {}
+
+  void emit_message() const override {
+    fprintf(stderr, "\e[0;%dm%-40s\e[0m\n", color, msg);
+  }
+};
+
 } // namespace tty
 } // namespace instrmt
 
@@ -66,5 +100,42 @@ extern "C" {
 {
   return new instrmt::tty::RegionContext(name ? name : function);
 }
+
+::instrmt::LiteralMessageContext* make_literal_message_context(const char* msg)
+{
+  return new instrmt::tty::LiteralMessageContext(msg);
+}
+
+void instrmt_dynamic_message(const char* msg)
+{
+  fprintf(stderr, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+}
+
+//void* make_c_region_context(const char* name,
+//                            const char* function,
+//                            const char* /*file*/,
+//                            int /*line*/)
+//{
+//  static std::atomic<unsigned long> current_context(0);
+
+//  TTYCRegionContext& ctx = contexts[current_context++];
+//  ctx.name = name ? name : function;
+//  ctx.color = instrmt_tty_string_color(ctx.name);
+
+//  return &ctx;
+//}
+
+//void* begin_region(void* context) {
+//  TTYCRegion* r = new TTYCRegion;
+//  r->ctx = reinterpret_cast<TTYCRegionContext*>(context);
+//  r->start = instrmt_get_time_ms();
+//  return r;
+//}
+
+//void end_region(void* region) {
+//  TTYCRegion* r = reinterpret_cast<TTYCRegion*>(region);
+//  fprintf(stderr, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", r->ctx->color, r->ctx->name,  instrmt_get_time_ms() - r->start);
+//  delete r;
+//}
 
 } // extern C

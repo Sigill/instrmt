@@ -23,6 +23,13 @@ public:
   }
 };
 
+class LiteralMessageContext {
+public:
+  virtual ~LiteralMessageContext() = default;
+
+  virtual void emit_message() const {}
+};
+
 } // namespace instrmt
 
 #endif // INSTRMTCORE_HXX

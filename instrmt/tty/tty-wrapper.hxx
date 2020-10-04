@@ -6,6 +6,7 @@
 
 
 #include <stdio.h>
+#include <string>
 
 struct InstrmtTTYRegionContext {
   const char* name;
@@ -37,6 +38,27 @@ public:
   }
 };
 
+class InstrmtTTYLiteralMessageContext {
+private:
+  const char* msg;
+  int color;
+
+public:
+  explicit InstrmtTTYLiteralMessageContext(const char* msg)
+    : msg(msg)
+    , color(instrmt_tty_string_color(msg))
+  {}
+
+  void emit_message() const {
+    printf("\e[0;%dm%-40s\e[0m\n", color, msg);
+  }
+};
+
+inline void instrmt_tty_emit_message(const char* msg)
+{
+  printf("\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+}
+
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
   static const struct InstrmtTTYRegionContext INSTRMTCONCAT(VAR, _instrmt_tty_region_ctx) = {NAME, instrmt_tty_string_color(NAME)}; \
   InstrmtTTYRegion INSTRMTCONCAT(VAR, _instrmt_tty_region)(INSTRMTCONCAT(VAR, _instrmt_tty_region_ctx))
@@ -52,5 +74,15 @@ public:
 #define INSTRMT_REGION_END() INSTRMT_NAMED_REGION_END(_)
 
 #define INSTRMT_FUNCTION() INSTRMT_NAMED_REGION(_, __FUNCTION__)
+
+#define INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG) \
+  static const InstrmtTTYLiteralMessageContext INSTRMTCONCAT(VAR, _instrmt_msg_ctx)(MSG); \
+  INSTRMTCONCAT(VAR, _instrmt_msg_ctx).emit_message()
+
+#define INSTRMT_LITERAL_MESSAGE(MSG) \
+  INSTRMT_NAMED_LITERAL_MESSAGE(_, MSG)
+
+#define INSTRMT_MESSAGE(MSG) \
+  instrmt_tty_emit_message(MSG)
 
 #endif // INSTRMTTTYWRAPPER_HXX

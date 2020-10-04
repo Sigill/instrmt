@@ -31,6 +31,12 @@ void f() {
 
 int main(int, char**) {
   INSTRMT_FUNCTION();
+
+  INSTRMT_LITERAL_MESSAGE("First call");
+  f();
+
+  std::string m = "Second call";
+  INSTRMT_MESSAGE(m.c_str());
   f();
   return 0;
 }
