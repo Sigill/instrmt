@@ -1,4 +1,5 @@
 #include <instrmt/details/base.hxx>
+#include <instrmt/details/engine.hxx>
 
 #include <stdio.h>
 #include <string>
@@ -87,12 +88,6 @@ public:
   }
 };
 
-} // namespace tty
-} // namespace instrmt
-
-
-extern "C" {
-
 ::instrmt::RegionContext* make_region_context(const char* name,
                                               const char* function,
                                               const char* /*file*/,
@@ -109,6 +104,19 @@ extern "C" {
 void instrmt_dynamic_message(const char* msg)
 {
   fprintf(stderr, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+}
+
+} // namespace tty
+} // namespace instrmt
+
+extern "C" {
+
+instrmt::InstrmtEngine make_instrmt_engine() {
+  return {
+    instrmt::tty::make_region_context,
+    instrmt::tty::make_literal_message_context,
+    instrmt::tty::instrmt_dynamic_message
+  };
 }
 
 //void* make_c_region_context(const char* name,

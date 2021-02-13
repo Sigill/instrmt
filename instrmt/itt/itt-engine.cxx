@@ -1,4 +1,5 @@
 #include <instrmt/details/base.hxx>
+#include <instrmt/details/engine.hxx>
 
 #include <ittnotify.h>
 
@@ -64,11 +65,6 @@ public:
   }
 };
 
-} // namespace itt
-} // namespace instrmt
-
-extern "C" {
-
 instrmt::RegionContext* make_region_context(const char* name,
                                             const char* function,
                                             const char* /*file*/,
@@ -85,6 +81,19 @@ instrmt::RegionContext* make_region_context(const char* name,
 void instrmt_dynamic_message(const char* msg)
 {
   __itt_marker(instrmt_domain, __itt_null, __itt_string_handle_create(msg), __itt_scope_global);
+}
+
+} // namespace itt
+} // namespace instrmt
+
+extern "C" {
+
+instrmt::InstrmtEngine make_instrmt_engine() {
+  return {
+    instrmt::itt::make_region_context,
+    instrmt::itt::make_literal_message_context,
+    instrmt::itt::instrmt_dynamic_message
+  };
 }
 
 } // extern C

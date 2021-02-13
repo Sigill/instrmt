@@ -4,22 +4,16 @@
 #include <dlfcn.h>
 
 #include <instrmt/details/base.hxx>
+#include <instrmt/details/utils.hxx>
+
+using instrmt::ansi::style;
 
 namespace {
 
-typedef instrmt::RegionContext* RegionContextFactory(const char* /*name*/,
-                                                     const char* /*function*/,
-                                                     const char* /*file*/,
-                                                     int /*line*/);
-
-typedef instrmt::LiteralMessageContext* LiteralMessageContextFactory(const char* /*msg*/);
-
-typedef void DynamicMessageSender(const char* /*msg*/);
+typedef instrmt::InstrmtEngine EngineFactory();
 
 void* handle = nullptr;
-RegionContextFactory* region_context_factory = nullptr;
-LiteralMessageContextFactory* literal_message_context_factory = nullptr;
-DynamicMessageSender* dynamic_message_sender = nullptr;
+instrmt::InstrmtEngine engine = {nullptr, nullptr, nullptr};
 
 template<typename F>
 F* load_function(const char* lib, const char* name) {
@@ -30,7 +24,7 @@ F* load_function(const char* lib, const char* name) {
   F* f = (F*)dlsym(handle, name);
   const char* dlsym_error = dlerror();
   if (dlsym_error) {
-    std::cerr << "\e[1;31mCannot load symbol " << name << " from " << lib << ": " << dlsym_error << "\e[0m\n";
+    std::cerr << style::red_bg << "Cannot load symbol " << name << " from " << lib << ": " << dlsym_error << style::reset << "\n";
   }
 
   return f;
@@ -44,15 +38,13 @@ int load_engine() {
 
   handle = dlopen(engine_lib, RTLD_LAZY);
   if (handle == nullptr) {
-    std::cerr << "\e[1;31mCannot load shared library " << engine_lib << ": " << dlerror() << "\e[0m\n";
+    std::cerr << style::red_bg << "Cannot load shared library " << engine_lib << "\n" << dlerror() << style::reset << "\n";
     return 0;
   }
 
-  region_context_factory = load_function<RegionContextFactory>(engine_lib, "make_region_context");
-
-  literal_message_context_factory = load_function<LiteralMessageContextFactory>(engine_lib, "make_literal_message_context");
-
-  dynamic_message_sender = load_function<DynamicMessageSender>(engine_lib, "instrmt_dynamic_message");
+  EngineFactory* make_engine = load_function<EngineFactory>(engine_lib, "make_instrmt_engine");
+  if (make_engine)
+    engine = make_engine();
 
   return 1;
 }
@@ -74,8 +66,8 @@ std::unique_ptr<RegionContext> make_region_context(const char* name,
 {
   (void)engine_guard();
 
-  if (region_context_factory)
-    return std::unique_ptr<RegionContext>(region_context_factory(name, function, file, line));
+  if (engine.region_context_factory)
+    return std::unique_ptr<RegionContext>(engine.region_context_factory(name, function, file, line));
   else
     return {};
 }
@@ -84,8 +76,8 @@ std::unique_ptr<LiteralMessageContext> make_literal_message_context(const char* 
 {
   (void)engine_guard();
 
-  if (literal_message_context_factory)
-    return std::unique_ptr<LiteralMessageContext>(literal_message_context_factory(msg));
+  if (engine.literal_message_context_factory)
+    return std::unique_ptr<LiteralMessageContext>(engine.literal_message_context_factory(msg));
   else
     return {};
 }
@@ -93,8 +85,8 @@ std::unique_ptr<LiteralMessageContext> make_literal_message_context(const char* 
 void emit_message(const char* msg) {
   (void)engine_guard();
 
-  if (dynamic_message_sender)
-    dynamic_message_sender(msg);
+  if (engine.dynamic_message_sender)
+    engine.dynamic_message_sender(msg);
 }
 
 } // namespace instrmt

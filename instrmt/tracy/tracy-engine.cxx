@@ -1,4 +1,5 @@
 #include <instrmt/details/base.hxx>
+#include <instrmt/details/engine.hxx>
 
 #ifndef TRACY_ENABLE
 #define TRACY_ENABLE
@@ -61,11 +62,6 @@ public:
   }
 };
 
-} // namespace tracy
-} // namespace instrmt
-
-extern "C" {
-
 instrmt::RegionContext* make_region_context(const char* name,
                                             const char *function,
                                             const char *file,
@@ -82,6 +78,19 @@ instrmt::RegionContext* make_region_context(const char* name,
 void instrmt_dynamic_message(const char* msg)
 {
   ___tracy_emit_message(msg, strlen(msg), 0);
+}
+
+} // namespace tracy
+} // namespace instrmt
+
+extern "C" {
+
+instrmt::InstrmtEngine make_instrmt_engine() {
+  return {
+    instrmt::tracy::make_region_context,
+    instrmt::tracy::make_literal_message_context,
+    instrmt::tracy::instrmt_dynamic_message
+  };
 }
 
 } // extern C

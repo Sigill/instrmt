@@ -31,7 +31,8 @@ function(instrmt_install_target e)
 endfunction()
 
 add_library(instrmt SHARED
-    instrmt/details/engine.cxx)
+    instrmt/details/engine.cxx
+    instrmt/details/utils.cxx)
 
 set(INSTRMT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -53,6 +54,7 @@ install(FILES
 
 install(FILES
     instrmt/details/utils.h
+    instrmt/details/utils.hxx
     instrmt/details/base.hxx
     instrmt/details/engine.hxx
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt/details)
