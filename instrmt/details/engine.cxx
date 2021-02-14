@@ -1,7 +1,8 @@
 #include <instrmt/details/engine.hxx>
 
-#include <iostream>
 #include <dlfcn.h>
+#include <iomanip>
+#include <iostream>
 
 #include <instrmt/details/base.hxx>
 #include <instrmt/details/utils.hxx>
@@ -24,7 +25,7 @@ F* load_function(const char* lib, const char* name) {
   F* f = (F*)dlsym(handle, name);
   const char* dlsym_error = dlerror();
   if (dlsym_error) {
-    std::cerr << style::red_bg << "Cannot load symbol " << name << " from " << lib << ": " << dlsym_error << style::reset << "\n";
+    std::cerr << style::red_bg << "[INSTRMT] Cannot load symbol " << name << " from " << lib << ": " << dlsym_error << style::reset << "\n";
   }
 
   return f;
@@ -38,7 +39,7 @@ int load_engine() {
 
   handle = dlopen(engine_lib, RTLD_LAZY);
   if (handle == nullptr) {
-    std::cerr << style::red_bg << "Cannot load shared library " << engine_lib << "\n" << dlerror() << style::reset << "\n";
+    std::cerr << style::red_bg << "[INSTRMT] Cannot load engine " << std::quoted(engine_lib, '\'') << ".\nReason: " << dlerror() << style::reset << "\n";
     return 0;
   }
 

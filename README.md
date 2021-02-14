@@ -19,16 +19,13 @@ A region define the start and end of a block of code (regions are similar to Int
 The following macros use RAII to bind the end of a region to the scope of the underlying variables.
 
 - `INSTRMT_FUNCTION()`: instrument the current scope, using the name of the function.
-
 - `INSTRMT_REGION(NAME)`: instrument the current scope, using a custom name.
-
 - `INSTRMT_NAMED_REGION(VAR, NAME)`: same as `INSTRMT_REGION`, but uses `VAR` as a prefix to prevent conflicts in the underlying variables.
 
-If you cannot relies on RAII, use the following macros to manually markup the start and end of a region.
+If you cannot rely on RAII, use the following macros to manually markup the start and end of a region.
 
-- `INSTRMT_REGION_BEGIN()`, `INSTRMT_REGION_END()`
-
-- `INSTRMT_NAMED_REGION_BEGIN(VAR)`, `INSTRMT_NAMED_REGION_END(VAR)`
+- `INSTRMT_REGION_BEGIN(NAME)`, `INSTRMT_REGION_END()`
+- `INSTRMT_NAMED_REGION_BEGIN(VAR, NAME)`, `INSTRMT_NAMED_REGION_END(VAR)`
 
 For performance reasons, `NAME` must be a string literal.
 
@@ -39,7 +36,6 @@ Messages allow you to log arbitrary events to help you navigate through a progra
 The following macros are available:
 
 - `INSTRMT_LITERAL_MESSAGE(MSG)`, `INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG)` for string literals.
-
 - `INSTRMT_MESSAGE(MSG)` for arbitrary strings.
 
 Note: Despite having an API for messages, VTune does not support them.
@@ -48,17 +44,29 @@ Note: Despite having an API for messages, VTune does not support them.
 
 ### Dynamic wrapper
 
-The *instrmt* library provides a mechanism to dynamically load a an instrumentation engine at runtime.
+The *instrmt* library provides a mechanism to dynamically load an instrumentation engine at runtime.
 
 To do that, include `instrmt/instrmt.hxx`, markup your code, and link against the `instrmt` library.
 
-At runtime, specify the engine to use using the `INSTRMT_ENGINE` environment variable. When undefined, the overhead should be minimal.
+At runtime, specify the engine to load using the `INSTRMT_ENGINE` environment variable. When undefined, the overhead should be minimal.
 
-Instrmt API can be disabled at compile time (rendering the macros no-op, and linking to `libinstrmt` not required) by defining the `INSTRMT_DISABLE` compilation option.
+Instrmt API can be disabled at compile time (rendering the macros no-op, and linking to the `instrmt` library not required) by defining the `INSTRMT_DISABLE` compilation option.
+
+#### Available engines
+
+- `libinstrmt-tty.so`
+
+  Available options
+  - `INSTRMT_TTY_OUT=stderr|stdout|<a file>`: Specify where to print the output.
+    When outputing to a file, if `%date%` is found in the filename, it will be replaced by the current date.
+  - `INSTRMT_TTY_TRUNCATE_OUT`: Cause the output file to be truncated before writing to it.
+- `libinstrmt-itt.so`
+- `libinstrmt-tracy.so`
 
 #### Example
 
-```
+```cpp
+// main.cpp
 #include <instrmt/instrmt.hxx>
 
 void f() {
@@ -72,7 +80,7 @@ int main(int, char**) {
 }
 ```
 
-```
+```sh
 $ g++ main.cpp -I/path/to/instrmt/include -L/path/to/instrmt/lib -linstrmt -ldl -o main
 
 $ ./main
