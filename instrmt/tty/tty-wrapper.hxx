@@ -4,9 +4,7 @@
 #include <instrmt/tty/tty-utils.h>
 #include <instrmt/details/utils.h>
 
-
 #include <stdio.h>
-#include <string>
 
 struct InstrmtTTYRegionContext {
   const char* name;
@@ -50,13 +48,13 @@ public:
   {}
 
   void emit_message() const {
-    printf("\e[0;%dm%-40s\e[0m\n", color, msg);
+    fprintf(stderr, "\e[0;%dm%-40s\e[0m\n", color, msg);
   }
 };
 
 inline void instrmt_tty_emit_message(const char* msg)
 {
-  printf("\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+  fprintf(stderr, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
 }
 
 #define INSTRMT_NAMED_REGION(VAR, NAME) \
