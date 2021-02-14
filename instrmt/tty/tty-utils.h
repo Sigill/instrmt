@@ -9,9 +9,9 @@ inline double instrmt_get_time_ms() {
   return time_s.tv_sec * 1000.0 + (time_s.tv_usec / 1000.0);
 }
 
-inline int instrmt_tty_string_color(const char* p) {
+constexpr int instrmt_tty_string_color(const char* p) {
   constexpr int num_colors = 14;
-  static const int colors[num_colors] = {
+  const int colors[num_colors] = {
     31, // red
     32, // green
     33, // yellow
