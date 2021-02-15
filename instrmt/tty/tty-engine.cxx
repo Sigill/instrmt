@@ -192,7 +192,7 @@ Region::~Region()
     else
       fprintf(config.sink.file, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
   } else if (config.format == OutputFormat::csv) {
-    fprintf(config.sink.file, "%-40s, %.3f\n", name, instrmt_get_time_ms() - start);
+    fprintf(config.sink.file, "%.3f; %s; %.3f\n", start, name, instrmt_get_time_ms() - start);
   }
 }
 
@@ -222,11 +222,11 @@ public:
   void emit_message() const override {
     if (config.format == OutputFormat::text) {
       if (color == 0)
-        fprintf(config.sink.file, "%-40s\n", msg);
+        fprintf(config.sink.file, "%s\n", msg);
       else
         fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", color, msg);
     } else if (config.format == OutputFormat::csv) {
-      fprintf(config.sink.file, "%s\n", msg);
+      fprintf(config.sink.file, "%.3f; %s\n", instrmt_get_time_ms(), msg);
     }
   }
 };
@@ -248,11 +248,11 @@ void instrmt_dynamic_message(const char* msg)
 {
   if (config.format == OutputFormat::text) {
     if (config.sink.color_support)
-      fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+      fprintf(config.sink.file, "\e[0;%dm%s\e[0m\n", instrmt_tty_string_color(msg), msg);
     else
-      fprintf(config.sink.file, "%-40s\n", msg);
+      fprintf(config.sink.file, "%s\n", msg);
   } else if (config.format == OutputFormat::csv) {
-    fprintf(config.sink.file, "%s\n", msg);
+    fprintf(config.sink.file, "%.3f; %s\n", instrmt_get_time_ms(), msg);
   }
 }
 
