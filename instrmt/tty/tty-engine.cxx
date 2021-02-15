@@ -8,6 +8,7 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <unistd.h>
 
 #include <instrmt/tty/tty-utils.h>
 
@@ -17,13 +18,13 @@ namespace {
 
 const char tty_out_env[] = "INSTRMT_TTY_OUT";
 const char tty_truncate_out_env[] = "INSTRMT_TTY_TRUNCATE_OUT";
+const char tty_color_env[] = "INSTRMT_TTY_COLOR";
 
 enum class OpenMode { write, append };
 
 std::ostream& operator<<(std::ostream& os, const OpenMode& mode) {
   return os << (mode == OpenMode::append ? "append" : "write");
 }
-
 class fopen_exception : public std::runtime_error {
 public:
   fopen_exception(const std::string& file, int errcode)
@@ -38,49 +39,81 @@ FILE* open_file(const std::string& filename, OpenMode mode) {
   return f;
 }
 
-struct SinkConfig {
+enum class ColorMode {No, Auto, Yes};
+
+bool has_color_support(FILE* f) {
+  return ::isatty(fileno(f));
+}
+
+struct Sink {
   FILE* file;
   std::string name;
   OpenMode mode;
   bool do_close;
+  bool color_support;
 
-  SinkConfig(FILE* f) noexcept
+  Sink() noexcept
+    : file(stderr)
+    , name("stderr")
+    , mode(OpenMode::write)
+    , do_close(false)
+    , color_support(false)
+  {}
+
+  Sink(FILE* f) noexcept
     : file(f)
     , name(f == stderr ? "stderr" : "stdout")
     , mode(OpenMode::write)
     , do_close(false)
+    , color_support(false)
   {}
 
-  SinkConfig(std::string name, OpenMode mode)
+  Sink(std::string name, OpenMode mode)
     : file(open_file(name, mode))
     , name(std::move(name))
     , mode(mode)
     , do_close(true)
+    , color_support(false)
   {}
 
-  SinkConfig(const SinkConfig&) = delete;
-  SinkConfig(SinkConfig&& other) noexcept
+  Sink(const Sink&) = delete;
+  Sink(Sink&& other) noexcept
     : file(std::exchange(other.file, nullptr))
     , name(std::move(other.name))
     , mode(std::move(other.mode))
     , do_close(std::exchange(other.do_close, false))
+    , color_support(std::move(other.color_support))
   {}
 
-  SinkConfig& operator=(const SinkConfig&) = delete;
-  SinkConfig& operator=(SinkConfig&& other) noexcept {
+  Sink& operator=(const Sink&) = delete;
+  Sink& operator=(Sink&& other) noexcept {
     if (do_close)
       fclose(file);
     file = std::exchange(other.file, nullptr);
     name = std::move(other.name);
     mode = std::move(other.mode);
     do_close = std::exchange(other.do_close, false);
+    color_support = std::move(other.color_support);
     return *this;
   }
 
-  ~SinkConfig() {
+  void configure_color_support(ColorMode mode) {
+    if (mode == ColorMode::Yes)
+      color_support = true;
+    else if (mode == ColorMode::No)
+      color_support = false;
+    else
+      color_support = has_color_support(file);
+  }
+
+  ~Sink() {
     if (do_close)
       fclose(file);
   }
+};
+
+struct Config {
+  Sink sink;
 };
 
 std::string format_file(std::string fmt) {
@@ -96,7 +129,7 @@ std::string format_file(std::string fmt) {
   return fmt;
 }
 
-SinkConfig make_sink() {
+Sink make_sink() {
   using namespace std::string_literals;
 
   const char* env_sink = getenv(tty_out_env);
@@ -111,7 +144,7 @@ SinkConfig make_sink() {
   }
 }
 
-SinkConfig sink = stderr;
+Config config;
 
 } // anonymous namespace
 
@@ -149,13 +182,16 @@ Region::Region(const char* name, int color)
 
 Region::~Region()
 {
-  fprintf(sink.file, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
+  if (color == 0)
+    fprintf(config.sink.file, "%-40s %.1f ms\n", name, instrmt_get_time_ms() - start);
+  else
+    fprintf(config.sink.file, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
 }
 
 RegionContext::RegionContext(const char* name)
   : instrmt::RegionContext()
   , name(name)
-  , color(instrmt_tty_string_color(name))
+  , color(config.sink.color_support ? instrmt_tty_string_color(name) : 0)
 {}
 
 Region*RegionContext::make_region_ptr()
@@ -172,11 +208,14 @@ public:
   explicit LiteralMessageContext(const char* msg)
     : instrmt::LiteralMessageContext ()
     , msg(msg)
-    , color(instrmt_tty_string_color(msg))
+    , color(config.sink.color_support ? instrmt_tty_string_color(msg) : 0)
   {}
 
   void emit_message() const override {
-    fprintf(sink.file, "\e[0;%dm%-40s\e[0m\n", color, msg);
+    if (color == 0)
+      fprintf(config.sink.file, "%-40s\n", msg);
+    else
+      fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", color, msg);
   }
 };
 
@@ -195,7 +234,10 @@ public:
 
 void instrmt_dynamic_message(const char* msg)
 {
-  fprintf(sink.file, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+  if (config.sink.color_support)
+    fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+  else
+    fprintf(config.sink.file, "%-40s\n", msg);
 }
 
 } // namespace tty
@@ -204,11 +246,24 @@ void instrmt_dynamic_message(const char* msg)
 extern "C" {
 
 instrmt::InstrmtEngine make_instrmt_engine() {
+  using namespace std::string_literals;
+
   try {
-    sink = make_sink();
-    std::cerr << style::green_fg << "[INSTRMT] TTY engine will " << sink.mode << " to: " << sink.name << "." << style::reset << "\n";
+    config.sink = make_sink();
+    std::cerr << style::green_fg << "[INSTRMT] TTY engine will " << config.sink.mode << " to: " << config.sink.name << "." << style::reset << "\n";
   } catch (const std::exception& ex) {
     std::cerr << style::red_bg << "[INSTRMT] TTY engine: " << ex.what() << ". Defaulting to stderr." << style::reset << "\n";
+  }
+
+  const char* color_mode = getenv(tty_color_env);
+  if ((color_mode == nullptr) || (color_mode == "auto"s)) {
+    config.sink.configure_color_support(ColorMode::Auto);
+  } else if (color_mode == "yes"s) {
+    config.sink.configure_color_support(ColorMode::Yes);
+  } else if (color_mode == "no"s) {
+    config.sink.configure_color_support(ColorMode::No);
+  } else {
+    std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported color mode." << style::reset << "\n";
   }
 
   return {
