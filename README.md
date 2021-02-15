@@ -61,6 +61,7 @@ Instrmt API can be disabled at compile time (rendering the macros no-op, and lin
     When outputing to a file, if `%date%` is found in the filename, it will be replaced by the current date.
   - `INSTRMT_TTY_TRUNCATE_OUT`: Cause the output file to be truncated before writing to it.
   - `INSTRMT_TTY_COLOR=auto|yes|no`: Enable/disable colored output (default: auto).
+  - `INSTRMT_TTY_FORMAT=text|csv`: Specify the output format.
 - `libinstrmt-itt.so`
 - `libinstrmt-tracy.so`
 

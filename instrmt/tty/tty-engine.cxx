@@ -19,6 +19,7 @@ namespace {
 const char tty_out_env[] = "INSTRMT_TTY_OUT";
 const char tty_truncate_out_env[] = "INSTRMT_TTY_TRUNCATE_OUT";
 const char tty_color_env[] = "INSTRMT_TTY_COLOR";
+const char tty_format_env[] = "INSTRMT_TTY_FORMAT";
 
 enum class OpenMode { write, append };
 
@@ -44,6 +45,8 @@ enum class ColorMode {No, Auto, Yes};
 bool has_color_support(FILE* f) {
   return ::isatty(fileno(f));
 }
+
+enum class OutputFormat { text, csv };
 
 struct Sink {
   FILE* file;
@@ -114,6 +117,7 @@ struct Sink {
 
 struct Config {
   Sink sink;
+  OutputFormat format = OutputFormat::text;
 };
 
 std::string format_file(std::string fmt) {
@@ -182,10 +186,14 @@ Region::Region(const char* name, int color)
 
 Region::~Region()
 {
-  if (color == 0)
-    fprintf(config.sink.file, "%-40s %.1f ms\n", name, instrmt_get_time_ms() - start);
-  else
-    fprintf(config.sink.file, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
+  if (config.format == OutputFormat::text) {
+    if (color == 0)
+      fprintf(config.sink.file, "%-40s %.1f ms\n", name, instrmt_get_time_ms() - start);
+    else
+      fprintf(config.sink.file, "\e[0;%dm%-40s \e[1;34m%.1f\e[0m ms\n", color, name, instrmt_get_time_ms() - start);
+  } else if (config.format == OutputFormat::csv) {
+    fprintf(config.sink.file, "%-40s, %.3f\n", name, instrmt_get_time_ms() - start);
+  }
 }
 
 RegionContext::RegionContext(const char* name)
@@ -212,10 +220,14 @@ public:
   {}
 
   void emit_message() const override {
-    if (color == 0)
-      fprintf(config.sink.file, "%-40s\n", msg);
-    else
-      fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", color, msg);
+    if (config.format == OutputFormat::text) {
+      if (color == 0)
+        fprintf(config.sink.file, "%-40s\n", msg);
+      else
+        fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", color, msg);
+    } else if (config.format == OutputFormat::csv) {
+      fprintf(config.sink.file, "%s\n", msg);
+    }
   }
 };
 
@@ -234,10 +246,14 @@ public:
 
 void instrmt_dynamic_message(const char* msg)
 {
-  if (config.sink.color_support)
-    fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
-  else
-    fprintf(config.sink.file, "%-40s\n", msg);
+  if (config.format == OutputFormat::text) {
+    if (config.sink.color_support)
+      fprintf(config.sink.file, "\e[0;%dm%-40s\e[0m\n", instrmt_tty_string_color(msg), msg);
+    else
+      fprintf(config.sink.file, "%-40s\n", msg);
+  } else if (config.format == OutputFormat::csv) {
+    fprintf(config.sink.file, "%s\n", msg);
+  }
 }
 
 } // namespace tty
@@ -255,15 +271,26 @@ instrmt::InstrmtEngine make_instrmt_engine() {
     std::cerr << style::red_bg << "[INSTRMT] TTY engine: " << ex.what() << ". Defaulting to stderr." << style::reset << "\n";
   }
 
-  const char* color_mode = getenv(tty_color_env);
-  if ((color_mode == nullptr) || (color_mode == "auto"s)) {
-    config.sink.configure_color_support(ColorMode::Auto);
-  } else if (color_mode == "yes"s) {
-    config.sink.configure_color_support(ColorMode::Yes);
-  } else if (color_mode == "no"s) {
-    config.sink.configure_color_support(ColorMode::No);
+  const char* format = getenv(tty_format_env);
+  if ((format == nullptr) || (format == "text"s)) {
+    config.format = OutputFormat::text;
+  } else if (format == "csv"s) {
+    config.format = OutputFormat::csv;
   } else {
-    std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported color mode." << style::reset << "\n";
+    std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported output format." << style::reset << "\n";
+  }
+
+  if (config.format == OutputFormat::text) {
+    const char* color_mode = getenv(tty_color_env);
+    if ((color_mode == nullptr) || (color_mode == "auto"s)) {
+      config.sink.configure_color_support(ColorMode::Auto);
+    } else if (color_mode == "yes"s) {
+      config.sink.configure_color_support(ColorMode::Yes);
+    } else if (color_mode == "no"s) {
+      config.sink.configure_color_support(ColorMode::No);
+    } else {
+      std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported color mode." << style::reset << "\n";
+    }
   }
 
   return {
