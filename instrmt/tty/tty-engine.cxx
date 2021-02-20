@@ -7,7 +7,6 @@
 #include <cstring>
 #include <string>
 #include <iostream>
-#include <iomanip>
 #include <unistd.h>
 
 #include <instrmt/tty/tty-utils.h>
@@ -20,6 +19,17 @@ const char tty_out_env[] = "INSTRMT_TTY_OUT";
 const char tty_truncate_out_env[] = "INSTRMT_TTY_TRUNCATE_OUT";
 const char tty_color_env[] = "INSTRMT_TTY_COLOR";
 const char tty_format_env[] = "INSTRMT_TTY_FORMAT";
+
+template<typename Target>
+Target lexical_cast(const std::string& value);
+
+template<typename Target>
+Target parse_env(const char* e, Target def) {
+  const char* value = getenv(e);
+  if (value == nullptr)
+    return def;
+  return lexical_cast<Target>(value);
+}
 
 enum class OpenMode { write, append };
 
@@ -40,13 +50,47 @@ FILE* open_file(const std::string& filename, OpenMode mode) {
   return f;
 }
 
+template<>
+bool lexical_cast(const std::string& value) {
+  if (value == "yes")
+    return true;
+  if (value == "no")
+    return false;
+  throw std::runtime_error("invalid boolean value: " + value);
+}
+
 enum class ColorMode {No, Auto, Yes};
+
+template<>
+ColorMode lexical_cast(const std::string& str) {
+  if (str == "auto")
+    return ColorMode::Auto;
+
+  try {
+    return lexical_cast<bool>(str) ? ColorMode::Yes : ColorMode::No;
+  } catch (...) {
+    throw std::runtime_error("invalid color mode: " + str);
+  }
+}
 
 bool has_color_support(FILE* f) {
   return ::isatty(fileno(f));
 }
 
 enum class OutputFormat { text, csv };
+template<>
+OutputFormat lexical_cast(const std::string& str) {
+  if (str == "text")
+    return OutputFormat::text;
+  if (str == "csv")
+    return OutputFormat::csv;
+
+  throw std::runtime_error("invalid output format: " + str);
+}
+
+std::ostream& operator<<(std::ostream& os, const OutputFormat& mode) {
+  return os << (mode == OutputFormat::text ? "text" : "csv");
+}
 
 struct Sink {
   FILE* file;
@@ -54,14 +98,6 @@ struct Sink {
   OpenMode mode;
   bool do_close;
   bool color_support;
-
-  Sink() noexcept
-    : file(stderr)
-    , name("stderr")
-    , mode(OpenMode::write)
-    , do_close(false)
-    , color_support(false)
-  {}
 
   Sink(FILE* f) noexcept
     : file(f)
@@ -116,7 +152,7 @@ struct Sink {
 };
 
 struct Config {
-  Sink sink;
+  Sink sink{stderr};
   OutputFormat format = OutputFormat::text;
 };
 
@@ -266,32 +302,27 @@ instrmt::InstrmtEngine make_instrmt_engine() {
 
   try {
     config.sink = make_sink();
-    std::cerr << style::green_fg << "[INSTRMT] TTY engine will " << config.sink.mode << " to: " << config.sink.name << "." << style::reset << "\n";
   } catch (const std::exception& ex) {
-    std::cerr << style::red_bg << "[INSTRMT] TTY engine: " << ex.what() << ". Defaulting to stderr." << style::reset << "\n";
+    std::cerr << style::red_bg << "[INSTRMT/TTY] " << ex.what() << ", defaulting to " << config.sink.name << style::reset << std::endl;
   }
 
-  const char* format = getenv(tty_format_env);
-  if ((format == nullptr) || (format == "text"s)) {
-    config.format = OutputFormat::text;
-  } else if (format == "csv"s) {
-    config.format = OutputFormat::csv;
-  } else {
-    std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported output format." << style::reset << "\n";
+  try {
+    config.format = parse_env<OutputFormat>(tty_format_env, OutputFormat::text);
+  } catch (...) {
+    std::cerr << style::red_bg << "[INSTRMT/TTY] Unsupported output format, defaulting to " << config.format << style::reset << std::endl;
   }
 
   if (config.format == OutputFormat::text) {
-    const char* color_mode = getenv(tty_color_env);
-    if ((color_mode == nullptr) || (color_mode == "auto"s)) {
-      config.sink.configure_color_support(ColorMode::Auto);
-    } else if (color_mode == "yes"s) {
-      config.sink.configure_color_support(ColorMode::Yes);
-    } else if (color_mode == "no"s) {
-      config.sink.configure_color_support(ColorMode::No);
-    } else {
-      std::cerr << style::red_bg << "[INSTRMT] TTY engine: Unsupported color mode." << style::reset << "\n";
+    ColorMode color_mode = ColorMode::Auto;
+    try {
+      color_mode = parse_env<ColorMode>(tty_color_env, ColorMode::Auto);
+    } catch (...) {
+      std::cerr << style::red_bg << "[INSTRMT/TTY] Unsupported color mode, defaulting to auto" << style::reset << std::endl;
     }
+    config.sink.configure_color_support(color_mode);
   }
+
+  std::cerr << style::green_fg << "[INSTRMT/TTY] out=" << config.sink.name << ", mode=" << config.sink.mode << ", format=" << config.format << ", color=" << std::boolalpha << config.sink.color_support << style::reset << std::endl;
 
   return {
     instrmt::tty::make_region_context,
