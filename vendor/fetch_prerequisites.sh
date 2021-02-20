@@ -103,14 +103,14 @@ function install_glfw() {
         download https://github.com/glfw/glfw/archive/3.3.2.tar.gz $glfw_tar 865e54ff0a100e9041a40429db98be0b &&
         extract $glfw_tar $glfw_src
       } && ( mkdir -p $glfw_bld && cd $glfw_bld && cmake -DCMAKE_INSTALL_PREFIX=$glfw_dep -DCMAKE_BUILD_TYPE=Release $glfw_src )
-    } && make -C $glfw_bld -j$(nproc) install
+    } && make -C $glfw_bld -j$(nproc) install && sed -i 's/Requires.private:  x11/Requires:  x11/g' "$HERE/vendor/glfw/lib/pkgconfig/glfw3.pc"
   }
 }
 
 function install_tracy_version() {
   export tracy_tar=$HERE/vendor/tmp/tracy-$tracy_ver.tar.gz
   export tracy_src=$HERE/vendor/tmp/tracy-$tracy_ver-src
-  export tracy_dep=$HERE/vendor/tracy
+  export tracy_dep=$HERE/vendor/tracy-$tracy_ver
   export tracy_library=$tracy_dep/lib/libtracy.so
   export tracy_capture=$tracy_dep/bin/capture
   export tracy_profiler=$tracy_dep/bin/tracy
@@ -122,7 +122,9 @@ function install_tracy_version() {
   [ -z "$build_tracylib" -a -z "$build_tracycapture" -a -z "$build_tracyprofiler" ] || {
     [ -d $tracy_src ] || {
       download https://github.com/wolfpld/tracy/archive/v$tracy_ver.tar.gz $tracy_tar $tracy_md5 &&
-      extract $tracy_tar $tracy_src && patch -p1 -d $tracy_src -i "$ROOT/vendor/tracy-pkgconfig-static.diff"
+      extract $tracy_tar $tracy_src &&
+      [ "$tracy_ver" != "0.7" -a "$tracy_ver" != "0.7.2" ] || patch -p1 -d $tracy_src -i "$ROOT/vendor/tracy-pkgconfig-static.diff" &&
+      [ "$tracy_ver" != "0.7.6" ] || sed -i 's/capstone.h/capstone\/capstone.h/g' "$tracy_src/server/TracyWorker.cpp" "$tracy_src/server/TracySourceView.cpp"
     } &&
     {
       [ -z $build_tracylib ] || {
@@ -149,7 +151,7 @@ function install_tracy_version() {
 
 function install_tracy() {
   if [ -z "$tracy_ver" ]; then
-    export tracy_ver=0.7.2
+    export tracy_ver=0.7.6
   fi
 
   case "$tracy_ver" in
@@ -158,6 +160,18 @@ function install_tracy() {
       ;;
     0.7.2)
       export tracy_md5=bceb615c494c3f7ccb77ba3bae20b216
+      ;;
+    0.7.3)
+      export tracy_md5=998be6c60079083aeb145e19cb24d2ee
+      ;;
+    0.7.4)
+      export tracy_md5=70f9b143d1d6ce84b59d49a275a5646c
+      ;;
+    0.7.5)
+      export tracy_md5=99cd76bc4ae9028623b256a9ef21f629
+      ;;
+    0.7.6)
+      export tracy_md5=828be21907a1bddf5762118cf9e3ff66
       ;;
     *)
       2> echo "Unsupported tracy version: $tracy_ver"
