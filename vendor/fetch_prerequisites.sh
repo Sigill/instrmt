@@ -18,32 +18,52 @@ export HERE="$PWD"
 mkdir -p vendor/tmp
 
 function install_cmake2() {
-  export cmake2_ver=2.8.12
-  export cmake2_tar=$HERE/vendor/tmp/cmake-$cmake2_ver.tar.gz
-  export cmake2_src=$HERE/vendor/tmp/cmake-$cmake2_ver-src
-  export cmake2_bld=$HERE/vendor/tmp/cmake-$cmake2_ver-bld
-  export cmake2_dep=$HERE/vendor/cmake2.8
+  export cmake_tar=$HERE/vendor/tmp/cmake-$cmake_ver.tar.gz
+  export cmake_src=$HERE/vendor/tmp/cmake-$cmake_ver-src
+  export cmake_bld=$HERE/vendor/tmp/cmake-$cmake_ver-bld
+  export cmake_dep=$HERE/vendor/cmake-$cmake_ver
 
-  [ -d $cmake2_dep ] || {
-    [ -d $cmake2_bld ] || {
-      [ -d $cmake2_src ] || {
-        download https://github.com/Kitware/CMake/archive/v2.8.12.tar.gz $cmake2_tar 0dc2118e56f5c02dc5a90be9bd19befc &&
-        extract $cmake2_tar $cmake2_src && patch -p1 -d $cmake2_src -i "$ROOT/vendor/cmake2812-noqt.diff"
-      } && ( mkdir -p $cmake2_bld && cd $cmake2_bld && $cmake2_src/bootstrap --parallel=$(nproc) --no-qt-gui --prefix=$cmake2_dep )
-    } && make -C $cmake2_bld -j$(nproc) install
+  [ -d $cmake_dep ] || {
+    [ -d $cmake_bld ] || {
+      [ -d $cmake_src ] || {
+        download https://github.com/Kitware/CMake/archive/v2.8.12.tar.gz $cmake_tar 0dc2118e56f5c02dc5a90be9bd19befc &&
+        extract $cmake_tar $cmake_src && patch -p1 -d $cmake_src -i "$ROOT/vendor/cmake2812-noqt.diff"
+      } && ( mkdir -p $cmake_bld && cd $cmake_bld && $cmake_src/bootstrap --parallel=$(nproc) --no-qt-gui --prefix=$cmake_dep )
+    } && make -C $cmake_bld -j$(nproc) install
   }
 }
 
 
 function install_cmake3() {
-  export cmake3_ver=3.18.0
-  export cmake3_tar=$HERE/vendor/tmp/cmake-$cmake3_ver-Linux-x86_64.tar.gz
-  export cmake3_dep=$HERE/vendor/cmake3
+  export cmake_tar=$HERE/vendor/tmp/cmake-$cmake_ver-Linux-x86_64.tar.gz
+  export cmake_dep=$HERE/vendor/cmake-$cmake_ver
 
-  [ -d $cmake3_dep ] || {
-    download https://github.com/Kitware/CMake/releases/download/v$cmake3_ver/cmake-$cmake3_ver-Linux-x86_64.tar.gz $cmake3_tar b777a4cb358153dc9b172ebf49426da0 &&
-    extract $cmake3_tar $cmake3_dep
+  [ -d $cmake_dep ] || {
+    download https://github.com/Kitware/CMake/releases/download/v$cmake_ver/cmake-$cmake_ver-Linux-x86_64.tar.gz $cmake_tar b777a4cb358153dc9b172ebf49426da0 &&
+    extract $cmake_tar $cmake_dep
   }
+}
+
+
+function install_cmake() {
+  if [ -z "$cmake_ver" ]; then
+    export cmake_ver=3.18.0
+  fi
+
+  case "$cmake_ver" in
+    2.8.12)
+      export cmake_md5=0dc2118e56f5c02dc5a90be9bd19befc
+      install_cmake2
+      ;;
+    3.18.0)
+      export cmake_md5=b777a4cb358153dc9b172ebf49426da0
+      install_cmake3
+      ;;
+    *)
+      2> echo "Unsupported cmake version: $cmake_ver"
+      exit -1
+      ;;
+  esac
 }
 
 
@@ -182,8 +202,7 @@ function install_tracy() {
   install_tracy_version
 }
 
-build_cmake2=
-build_cmake3=
+build_cmake=
 build_ittapi=
 build_capstone=
 build_glfw=
@@ -195,11 +214,8 @@ build_tracyprofiler=
 
 while (( "$#" )); do
   case "$1" in
-    --cmake2)
-      build_cmake2=1
-      ;;
-    --cmake3)
-      build_cmake3=1
+    --cmake)
+      build_cmake=1
       ;;
     --ittapi)
       build_ittapi=1
@@ -229,8 +245,7 @@ while (( "$#" )); do
   shift
 done
 
-[ -z "$build_cmake2" ] || install_cmake2 || exit -1
-[ -z "$build_cmake3" ] || install_cmake3 || exit -1
+[ -z "$build_cmake" ] || install_cmake || exit -1
 [ -z "$build_ittapi" ] || install_ittapi || exit -1
 [ -z "$build_capstone" ] || install_capstone || exit -1
 [ -z "$build_glfw" ] || install_glfw || exit -1

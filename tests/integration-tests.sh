@@ -51,7 +51,7 @@ function build_instrmt() {
    [ -d $2 ] || ( mkdir -p "$1" && cd "$1" && cmd cmake \
     -DINSTRMT_BUILD_TRACY_ENGINE=ON \
     -DINSTRMT_BUILD_ITT_ENGINE=ON \
-    -DTRACY_ROOT=$HERE/vendor/tracy \
+    -DTRACY_ROOT=$HERE/vendor/tracy-$tracy_ver \
     -DVTUNE_ROOT=$HERE/vendor/ittapi \
     -DCMAKE_CXX_FLAGS=-std=c++14 \
     -DCMAKE_INSTALL_PREFIX=$2 \
@@ -63,7 +63,7 @@ function build_example() {
   info "Using $1"
   ( cd "$2" && cmd cmake \
     -DInstrmt_DIR="$1" \
-    -DTRACY_ROOT=$HERE/vendor/tracy \
+    -DTRACY_ROOT=$HERE/vendor/tracy-$tracy_ver \
     -DVTUNE_ROOT=$HERE/vendor/ittapi \
     -DCMAKE_CXX_FLAGS=-std=c++14 \
     "$ROOT/example" && make -j$(nproc) )
@@ -73,23 +73,23 @@ function build_examples() {
   local status=0
 
   info "$(cmake_version)"
-  build_instrmt $HERE/$1/instrmt/build $HERE/$1/instrmt/dist || KO status && OK &&
+  build_instrmt $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/build $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/dist || KO status && OK &&
   {
-    build_example $HERE/$1/instrmt/build $HERE/$1/example-build || KO status && OK
-    build_example $HERE/$1/instrmt/dist/share/cmake $HERE/$1/example-dist || KO status && OK
+    build_example $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/build $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-build || KO status && OK
+    build_example $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/dist/share/cmake $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-dist || KO status && OK
   }
 
   return $status
 }
 
-mkdir -p 2.8/example-build 2.8/example-dist 3/example-build 3/example-dist
+if [ -z "${cmake_ver}" ]; then
+  export cmake_ver=3.18.0
+fi
 
-(
-  export PATH=$HERE/vendor/cmake2.8/bin:$PATH
-  build_examples 2.8
-)
+if [ -z "$tracy_ver" ]; then
+  export tracy_ver=0.7.6
+fi
 
-(
-  export PATH=$HERE/vendor/cmake3/bin:$PATH
-  build_examples 3
-)
+export PATH=$HERE/vendor/cmake-${cmake_ver}/bin:$PATH
+mkdir -p integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-build integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-dist
+build_examples
