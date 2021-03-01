@@ -10,7 +10,7 @@ mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
 include(CMakePackageConfigHelpers)
 include(CTest)
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 include(instrmt)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
