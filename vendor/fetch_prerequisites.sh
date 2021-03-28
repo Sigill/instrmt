@@ -39,7 +39,7 @@ function install_cmake3() {
   export cmake_dep=$HERE/vendor/cmake-$cmake_ver
 
   [ -d $cmake_dep ] || {
-    download https://github.com/Kitware/CMake/releases/download/v$cmake_ver/cmake-$cmake_ver-Linux-x86_64.tar.gz $cmake_tar b777a4cb358153dc9b172ebf49426da0 &&
+    download https://github.com/Kitware/CMake/releases/download/v$cmake_ver/cmake-$cmake_ver-Linux-x86_64.tar.gz $cmake_tar $cmake_md5 &&
     extract $cmake_tar $cmake_dep
   }
 }
@@ -47,7 +47,7 @@ function install_cmake3() {
 
 function install_cmake() {
   if [ -z "$cmake_ver" ]; then
-    export cmake_ver=3.18.0
+    export cmake_ver=3.20.0
   fi
 
   case "$cmake_ver" in
@@ -55,8 +55,8 @@ function install_cmake() {
       export cmake_md5=0dc2118e56f5c02dc5a90be9bd19befc
       install_cmake2
       ;;
-    3.18.0)
-      export cmake_md5=b777a4cb358153dc9b172ebf49426da0
+    3.20.0)
+      export cmake_md5=9775844c038dd0b2ed80bce4747ba6bf
       install_cmake3
       ;;
     *)

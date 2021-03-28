@@ -76,7 +76,7 @@ function build_examples() {
   build_instrmt $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/build $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/dist || KO status && OK &&
   {
     build_example $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/build $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-build || KO status && OK
-    build_example $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/dist/share/cmake $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-dist || KO status && OK
+    build_example $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/instrmt/dist/lib/cmake/instrmt $HERE/integ_cmake-${cmake_ver}_tracy-${tracy_ver}/example-dist || KO status && OK
   }
 
   return $status

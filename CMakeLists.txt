@@ -4,7 +4,7 @@ project(Instrmt)
 set(INSTRMT_VERSION "0.1.0")
 
 include(GNUInstallDirs)
-set(CMAKE_INSTALL_CMAKEDIR "share/cmake" CACHE PATH "Install location for cmake related files")
+set(CMAKE_INSTALL_CMAKEDIR "lib/cmake/instrmt" CACHE PATH "Install location for cmake related files")
 mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
 
 include(CMakePackageConfigHelpers)
@@ -77,7 +77,7 @@ configure_file(InstrmtConfig.in.cmake
     "${PROJECT_BINARY_DIR}/InstrmtConfig.cmake" @ONLY)
 
 # Create the config file for the install tree.
-set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/../../${CMAKE_INSTALL_INCLUDEDIR}")
+set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/../../../${CMAKE_INSTALL_INCLUDEDIR}")
 configure_file(InstrmtConfig.in.cmake
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake" @ONLY)
 
