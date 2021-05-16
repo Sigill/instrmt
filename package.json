@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "chalk": "^4.1.0",
+    "commander": "^7.1.0",
+    "execa": "^5.0.0",
+    "follow-redirects": "^1.13.3",
+    "fs-extra": "^10.0.0",
+    "glob-fs": "^0.1.7",
+    "is-interactive": "^2.0.0",
+    "mkdirp": "^1.0.4",
+    "path-is-inside": "^1.0.2",
+    "replace-in-file": "^6.2.0",
+    "rimraf": "^3.0.2",
+    "semver": "^7.3.5",
+    "shell-quote": "^1.7.2",
+    "tar": "^6.1.0"
+  },
+  "scripts": {},
+  "devDependencies": {
+    "eslint": "^7.27.0"
+  }
+}
