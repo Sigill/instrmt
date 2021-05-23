@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04]
-        compiler: [gcc9, gcc10]
+        compiler: [gcc9, gcc10, clang11, clang12]
 
     runs-on: ${{ matrix.os }}
 
@@ -22,23 +22,26 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Install GCC
-      if: matrix.compiler == 'gcc10'
+    - name: Enable compiler
       run: |
-         sudo apt update
-         sudo apt install gcc-10 g++-10
-
-    - name: Enable gcc9
-      if: matrix.compiler == 'gcc9'
-      run: |
-         echo CC=gcc-9 >> "$GITHUB_ENV"
-         echo CXX=g++-9 >> "$GITHUB_ENV"
-
-    - name: Enable gcc10
-      if: matrix.compiler == 'gcc10'
-      run: |
-         echo CC=gcc-10 >> "$GITHUB_ENV"
-         echo CXX=g++-10 >> "$GITHUB_ENV"
+        case ${{ matrix.compiler }} in
+          gcc9)
+            echo CC=gcc-9 >> "$GITHUB_ENV"
+            echo CXX=g++-9 >> "$GITHUB_ENV"
+            ;;
+          gcc10)
+            echo CC=gcc-10 >> "$GITHUB_ENV"
+            echo CXX=g++-10 >> "$GITHUB_ENV"
+            ;;
+          clang11)
+            echo CC=clang-11 >> "$GITHUB_ENV"
+            echo CXX=clang++-11 >> "$GITHUB_ENV"
+            ;;
+          clang12)
+            echo CC=clang-12 >> "$GITHUB_ENV"
+            echo CXX=clang++-12 >> "$GITHUB_ENV"
+            ;;
+        esac
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -46,7 +49,6 @@ jobs:
         key: ${{ matrix.os }}-${{ matrix.compiler }}
 
     - name: Install node modules
-      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       run: npm i --production
 
     - name: Cache ittapi
