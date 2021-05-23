@@ -1,5 +1,6 @@
 #include <instrmt/instrmt.hxx>
 
+#include <string>
 #include <thread>
 #include <chrono>
 
