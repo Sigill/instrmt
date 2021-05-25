@@ -1,0 +1,66 @@
+#!/bin/bash
+
+PRETTY=
+test -t 1 && PRETTY=color
+
+has_unbuffer() {
+    command -v unbuffer >/dev/null 2>&1
+}
+
+QUIET=
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    -q)
+        QUIET=y
+        shift
+        ;;
+    *)
+        break
+        ;;
+    esac
+done
+
+command -v shell-quote >/dev/null 2>&1 && quoted_command=$(shell-quote "$@") || quoted_command="${@@Q}"
+
+if [ -n "$PRETTY" ]; then
+    echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m \e[34m<\e[39m "
+    echo "$quoted_command"
+else
+    echo "$(date +%H:%M:%S) < $quoted_command"
+fi
+
+if [ "$QUIET" = y ]; then
+    TMPFILE=$(mktemp) || exit 1
+    trap 'rm -f "$TMPFILE"' EXIT
+
+    if [ -n "$PRETTY" -a has_unbuffer ]; then
+        unbuffer "$@" &> "$TMPFILE"
+    else
+        "$@" &> "$TMPFILE"
+    fi
+    status=$?
+
+    if [ $status -ne 0 ]; then
+        cat "$TMPFILE"
+    fi
+else
+    "$@"
+    status=$?
+fi
+
+if [ $status -eq 0 ]; then
+    if [ -n "$PRETTY" ]; then
+        echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m \e[32m>\e[39m "
+        echo "$quoted_command"
+    else
+        echo "$(date +%H:%M:%S) > $quoted_command"
+    fi
+else
+    if [ -n "$PRETTY" ]; then
+        echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m \e[31mx\e[39m "
+        echo "$quoted_command ($status)"
+    else
+        echo "$(date +%H:%M:%S) x $quoted_command"
+    fi
+fi

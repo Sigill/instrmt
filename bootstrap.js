@@ -19,21 +19,11 @@ const semver = require('semver');
 const shellquote = require('shell-quote');
 const tar = require('tar');
 const commander = require('commander');
-const { spawnSync, } = require('child_process');
 
-function log_cmd(...args) {
-  console.log();
-  console.log(chalk.blue(shellquote.quote(args)));
-  console.log();
-}
-
-function shell(command, args, { dry_run = false, cwd, env } = {}) {
-  log_cmd(command, ...args);
-  if (!dry_run) {
-    let process = spawnSync(command, args, { stdio: ['ignore', 'inherit', 'inherit'], cwd, env });
-    if (process.status === null || process.status !== 0)
-      throw new Error(`Process failed: ${command} ${args.join(' ')}`);
-  }
+function shell(command, args, { quiet = false, cwd, env, stdio = ['ignore', 'inherit', 'inherit'] } = {}) {
+  const step_args = [command, ...args];
+  if (quiet) step_args.unshift('-q');
+  execa.sync(`${__dirname}/docker/step`, step_args, { stdio, cwd, env });
 }
 
 function as_array(arg) {
@@ -163,14 +153,19 @@ async function unpack_archive({url, file, checksum, download_dir, strip_componen
 
 function nproc() { return os.cpus().length; }
 
-function cmake_configure(src, bld, {cmake='cmake', build_type, install_prefix, args = []} = {}) {
-  var cmd = ['-S', src, '-B', bld];
-  if (build_type)
-    cmd.push(`-DCMAKE_BUILD_TYPE=${build_type}`);
-  if (install_prefix)
-    cmd.push(`-DCMAKE_INSTALL_PREFIX=${install_prefix}`);
+function cmake_configure_command(src, bld, {cmake='cmake', buildType, installPrefix, args = []} = {}) {
+  var cmd = [cmake, '-S', src, '-B', bld];
+  if (buildType)
+    cmd.push(`-DCMAKE_BUILD_TYPE=${buildType}`);
+  if (installPrefix)
+    cmd.push(`-DCMAKE_INSTALL_PREFIX=${installPrefix}`);
   cmd.push(...as_array(args));
-  shell(cmake, cmd);
+  return cmd;
+}
+
+function cmake_configure(src, bld, {cmake='cmake', buildType, installPrefix, args = []} = {}) {
+  const cmd = cmake_configure_command(src, bld, {cmake, buildType, installPrefix, args});
+  shell(cmd[0], cmd.slice(1));
 }
 
 function cmake_build(bld, {cmake, target} = {}) {
@@ -182,10 +177,10 @@ function cmake_build(bld, {cmake, target} = {}) {
   shell(cmake, cmd);
 }
 
-function cmake_basic_recipe(srcdir, builddir, {build_type = 'Release', install_prefix, args = []} = {}) {
+function cmake_basic_recipe(srcdir, builddir, {buildType = 'Release', installPrefix, args = []} = {}) {
   mkdirp.sync(builddir);
-  cmake_configure(srcdir, builddir, {build_type, install_prefix, args});
-  cmake_build(builddir, {target: install_prefix ? 'install' : undefined});
+  cmake_configure(srcdir, builddir, {buildType, installPrefix, args});
+  cmake_build(builddir, {target: installPrefix ? 'install' : undefined});
 }
 
 function install(files, dir, {filename, base} = {}) {
@@ -246,7 +241,7 @@ async function fetch_cmake28({directory = requiredArg('directory')} = {}) {
                         dest: dirs.src,
                         strip_components: 1});
 
-  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'vendor', 'cmake2812-noqt.diff')]);
+  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'cmake2812-noqt.diff')]);
   mkdirp.sync(dirs.build);
   shell(path.join(dirs.src, 'bootstrap'), [`--parallel=${nproc()}`, '--no-qt-gui', `--prefix=${dirs.install}`], {cwd: dirs.build});
   shell('make', ['-C', dirs.build, `-j${nproc()}`, 'install']);
@@ -283,7 +278,7 @@ async function fetch_ittapi({directory = requiredArg('directory'), version = req
                         dest: dirs.src,
                         strip_components: 1});
 
-  cmake_basic_recipe(dirs.src, dirs.build, {build_type: cmakeBuildType});
+  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType});
 
   install(glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)')),
           path.join(dirs.install, 'include'),
@@ -307,9 +302,9 @@ async function fetch_capstone({directory = requiredArg('directory'), version = r
                         dest: dirs.src,
                         strip_components: 1});
 
-  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'vendor', 'capstone-pkgconfig-includedir.diff')]);
+  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')]);
 
-  cmake_basic_recipe(dirs.src, dirs.build, {build_type: cmakeBuildType, install_prefix: dirs.install});
+  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install});
 
   // Drop the dynamic libraries in order to force the use of the static ones when building tracy-profiler.
   glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f));
@@ -332,8 +327,8 @@ async function fetch_glfw({directory = requiredArg('directory'), version = requi
                         strip_components: 1});
 
   cmake_basic_recipe(dirs.src, dirs.build,
-                     {build_type: cmakeBuildType,
-                      install_prefix: dirs.install,
+                     {buildType: cmakeBuildType,
+                      installPrefix: dirs.install,
                       args: ['-DGLFW_BUILD_DOCS=OFF', '-DGLFW_BUILD_EXAMPLES=OFF', '-DGLFW_BUILD_TESTS=OFF']});
 
   sed(path.join(dirs.install, 'lib/pkgconfig/glfw3.pc'), 'Requires.private:  x11', 'Requires:  x11');
@@ -357,7 +352,7 @@ async function fetch_tracy({directory = requiredArg('directory'), version = requ
                         strip_components: 1});
 
   if (semver.ltr(version, '0.7.2')) {
-    shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'vendor', 'tracy-pkgconfig-static.diff')]);
+    shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'tracy-pkgconfig-static.diff')]);
   }
 
   if (version === 'master' || semver.gte(version, '0.7.6')) {
@@ -426,7 +421,7 @@ async function fetch_google_benchmark({directory = requiredArg('directory'), ver
                         dest: dirs.src,
                         strip_components: 1});
 
-  cmake_basic_recipe(dirs.src, dirs.build, {build_type: cmakeBuildType, install_prefix: dirs.install, args: ['-DBENCHMARK_ENABLE_TESTING=OFF']});
+  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DBENCHMARK_ENABLE_TESTING=OFF']});
 
   dirs.temp.forEach(e => rimraf.sync(e));
 }
@@ -469,7 +464,7 @@ function dependency(name, version) {
     basename: function(suffix) {
       return [name, pretty_version(version), suffix].filter(e => e).join('-');
     },
-    path: function(prefix) {
+    path: function(prefix = path.join(__dirname, 'vendor')) {
       return path.join(prefix, this.basename());
     },
     checksum: function() {
@@ -600,10 +595,34 @@ program
 
 function build_examples(instrmt_dir, build_dir, cmake_bin, ittapi_root, tracy_root) {
   cmake_configure(path.join(__dirname, 'example'), build_dir,
-                  {build_type: 'Release',
+                  {buildType: 'Release',
                    cmake: cmake_bin,
                    args: [`-DInstrmt_DIR=${instrmt_dir}`, `-DVTUNE_ROOT=${ittapi_root}`, `-DTRACY_ROOT=${tracy_root}`]});
   cmake_build(build_dir, {cmake: cmake_bin});
+}
+
+function instrmt_configure_command(srcdir, builddir, {buildType, ittapi, tracy, googleBenchmark, vendorDir, args = []} = {}) {
+  let cmakeArgs = [];
+
+  if (ittapi) {
+    if (ittapi === true)
+      ittapi = dependency('ittapi').path(vendorDir);
+    cmakeArgs.push('-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${ittapi}`);
+  }
+  if (tracy) {
+    if (tracy === true)
+      tracy = dependency('tracy').path(vendorDir);
+    cmakeArgs.push('-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${tracy}`);
+  }
+  if (googleBenchmark) {
+    if (googleBenchmark === true)
+      googleBenchmark = path.join(dependency('google-benchmark').path(vendorDir), 'lib', 'cmake', 'benchmark');
+    cmakeArgs.push('-DBUILD_BENCHMARKS=ON', `-Dbenchmark_DIR=${googleBenchmark}`);
+  }
+
+  cmakeArgs = cmakeArgs.concat(args);
+
+  return cmake_configure_command(srcdir, builddir, {buildType, args: cmakeArgs});
 }
 
 program
@@ -617,27 +636,18 @@ program
   .option('--with-benchmarks [directory]', absolute_path)
   .option('--build [target]')
   .action((options, command) => {
-    if (options.withIttapi === true)
-      options.withIttapi = dependency('ittapi').path(path.join(__dirname, 'vendor'));
-    if (options.withTracy === true)
-      options.withTracy = dependency('tracy').path(path.join(__dirname, 'vendor'));
-    if (options.withBenchmarks === true)
-      options.withBenchmarks = path.join(dependency('google-benchmark').path(path.join(__dirname, 'vendor')), 'lib', 'cmake', 'benchmark');
+    let [cmd, ...args] = instrmt_configure_command(__dirname,
+                                                   options.directory,
+                                                   {
+                                                     buildType: options.cmakeBuildType,
+                                                     ittapi: options.withIttapi,
+                                                     tracy: options.withTracy,
+                                                     googleBenchmark: options.withBenchmarks,
+                                                     vendorDir: path.join(__dirname, 'vendor'),
+                                                     args: command.args
+                                                   });
 
-    let cmakeArgs = [];
-    if (options.withIttapi) {
-      cmakeArgs.push('-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${options.withIttapi}`);
-    }
-    if (options.withTracy) {
-      cmakeArgs.push('-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${options.withTracy}`);
-    }
-    if (options.withBenchmarks) {
-      cmakeArgs.push('-DBUILD_BENCHMARKS=ON', `-Dbenchmark_DIR=${options.withBenchmarks}`);
-    }
-
-    cmakeArgs = cmakeArgs.concat(command.args || []);
-
-    cmake_configure(__dirname, options.directory, {build_type: options.cmakeBuildType, args: cmakeArgs});
+    shell(cmd, args);
 
     if (options.build) {
       if (options.build === true) {
@@ -663,8 +673,8 @@ program
 
     cmake_configure(__dirname, instrmt_bld,
                     {cmake: options.cmake,
-                     build_type: 'Release',
-                     install_prefix: instrmt_dist,
+                     buildType: 'Release',
+                     installPrefix: instrmt_dist,
                      args: [
                        '-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${options.ittapiRoot}`,
                        '-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${options.tracyRoot}`,
@@ -689,46 +699,82 @@ function docker_volumes() {
 
 program
   .command('ci')
+  .option('--docker', '')
   .option('--fast', 'Skip npm modules and dependencies installation.')
   .option('--shell', 'Keep shell open at the end.')
+  .option('-W, --warning-as-error', '')
+  .option('-q, --quiet', '')
+  .option('--no-test', '')
   .action(async (options) => {
-    if (!docker_volumes().includes('instrmt-build-cache')) {
-      execa.sync('docker', ['volume', 'create', 'instrmt-build-cache']);
+    const quiet = !!options.quiet;
+
+    if (options.docker) {
+      const branch = execa.sync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
+
+      if (!docker_volumes().includes('instrmt-build-cache')) {
+        execa.sync('docker', ['docker', 'volume', 'create', 'instrmt-build-cache']);
+      }
+
+      const commands = [
+        `git clone --depth 1 -b ${branch} /repo /src`,
+        `ln -snf /cache/node_modules /src/node_modules`,
+        `ln -snf /cache/vendor /src/vendor`
+      ];
+
+      if (!options.fast) {
+        commands.push('npm i --production');
+      }
+
+      const ci_opts = function*() {
+        if (options.fast) yield '--fast';
+        if (options.warningAsError) yield '-W';
+        if (options.test) yield '--test'; else yield '--no-test';
+        if (quiet) yield '-q';
+      };
+      commands.push(shellquote.quote(['node', 'bootstrap.js', 'ci', ...ci_opts()]));
+
+      const step = quiet ? 'step -q' : 'step';
+      let script = commands.map(e => `${step} ${e}`).join(' && ');
+
+      if (options.shell) {
+        script = `${script} ; bash`;
+      }
+
+      shell('docker',
+            [ 'run', '--rm', (options.shell ? '-it' : '-t'), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
+              'instrmt-build',
+              'bash', '-c', script ],
+            {stdio: 'inherit'});
+    } else {
+      if (!options.fast) {
+        shell('node', ['bootstrap.js', 'fetch-ittapi'], {quiet});
+        shell('node', ['bootstrap.js', 'fetch-tracy'], {quiet});
+        shell('node', ['bootstrap.js', 'fetch-google-benchmark'], {quiet});
+      }
+
+      const ittapi_dir = dependency('ittapi').path();
+      const tracy_dir = dependency('tracy').path();
+      const google_benchmark_dir = `${dependency('google-benchmark').path()}/lib/cmake/benchmark`;
+
+      const configure = instrmt_configure_command(__dirname,
+                                                  path.join(__dirname, 'build'),
+                                                  {
+                                                    buildType: 'Release',
+                                                    ittapi: ittapi_dir,
+                                                    tracy: tracy_dir,
+                                                    googleBenchmark: google_benchmark_dir,
+                                                    args: options.warningAsError ? ['-DCMAKE_CXX_FLAGS=-Werror'] : []
+                                                  });
+
+      shell(configure[0], configure.slice(1), {quiet});
+      shell('cmake', ['--build', path.join(__dirname, 'build'), '-j', `${nproc()}`], {quiet});
+
+      if (options.test) {
+        shell('env', ['-C', 'build', 'ctest'], {quiet});
+        shell('node', ['bootstrap.js', 'integration-tests', '--ittapi-root', ittapi_dir, '--tracy-root', tracy_dir], {quiet});
+      }
     }
 
-    const branch = execa.sync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
-
-    const commands = [
-      `git clone --depth 1 -b ${branch} /repo /src`,
-      `ln -snf /cache/node_modules /src/node_modules`
-    ];
-
-    if (!options.fast) {
-      commands.push(
-        `npm i --production`,
-        `node bootstrap.js fetch-ittapi --directory /cache/vendor`,
-        `node bootstrap.js fetch-tracy --directory /cache/vendor`,
-        `node bootstrap.js fetch-google-benchmark --directory /cache/vendor`
-      );
-    }
-
-    const ittapi_dir = dependency('ittapi').path('/cache/vendor');
-    const tracy_dir = dependency('tracy').path('/cache/vendor');
-    const google_benchmark_dir = `${dependency('google-benchmark').path('/cache/vendor')}/lib/cmake/benchmark`;
-
-    commands.push(`node bootstrap.js configure --with-ittapi ${ittapi_dir} --with-tracy ${tracy_dir} --with-benchmarks ${google_benchmark_dir}`,
-                  `make -C build -j ${nproc()} --no-print-directory`,
-                  `env -C build ctest`,
-                  `node bootstrap.js integration-tests --ittapi-root ${ittapi_dir} --tracy-root ${tracy_dir}`);
-
-    let script = commands.join(' && ');
-    if (options.shell) {
-      script = `${script} ; bash`;
-    }
-
-    execa.sync('docker',
-               ['run', '--rm', (options.shell ? '-it' : '-t'), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache', 'instrmt-build', 'bash', '-xc', script],
-               {stdin: 'inherit', stdout: 'inherit', stderr: 'inherit'});
   });
 
 program.parseAsync(process.argv)
