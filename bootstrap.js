@@ -172,26 +172,27 @@ function isDirectory(p) {
   return fs.existsSync(p) && fs.lstatSync(p).isDirectory();
 }
 
-function listr_execa_promise(task, command, {quiet=false, env, cwd, stdio} = {}) {
+function listr_execa_promise(command, {quiet=false, env, cwd} = {}) {
   assert(Array.isArray(command) && command.length > 1, 'Command is not a valid array');
 
-  return execa(`${__dirname}/docker/mergestd.sh`, ['unbuffer', ...command], {env, cwd, stdio})
-    .then(result => {
-      if (!quiet && result.stdout) task.output = result.stdout;
-    })
+  let p = quiet
+    ? execa('unbuffer', [...command], {env, cwd, all: true})
+    : execa(command[0], command.slice(1), {env, cwd, stdio: 'inherit'});
+
+  return p
     .catch(err => {
-      if (err.stdout) task.output = err.stdout;
-      throw new Listr.ListrError(`Command failed with exit code ${err.exitCode}`);
+      if (err.all) console.log(err.all);
+      throw new Error(`Command failed with exit code ${err.exitCode}`);
     });
 }
 
-function listr_execa_task(command, {quiet=false, title, skip, enabled, env, cwd, stdio, pre, post} = {}) {
+function listr_execa_task(command, {quiet=false, title, skip, enabled, env, cwd, pre, post} = {}) {
   return {
     title: title || shellquote.quote(command),
     skip,
     enabled,
     task: (ctx, task) => {
-      const f = () => listr_execa_promise(task, command, {quiet, env, cwd, stdio});
+      const f = () => listr_execa_promise(command, {quiet, env, cwd});
 
       let chain = pre
         ? new Promise( resolve => resolve(pre(ctx, task)) ).then(f)
@@ -217,7 +218,7 @@ function listr_checksum_task(file, expected_checksum, {quiet} = {}) {
     skip: () => !expected_checksum && (quiet || 'Checksum not specified'),
     task: () => md5sum(file).then(actual_checksum => {
       if (actual_checksum !== expected_checksum)
-        throw new Listr.ListrError(`md5(${file}) = ${actual_checksum} != ${expected_checksum}`);
+        throw new Error(`md5(${file}) = ${actual_checksum} != ${expected_checksum}`);
     })
   };
 }
@@ -635,7 +636,7 @@ function build_examples(instrmt_dir, build_dir, cmake_bin, ittapi_root, tracy_ro
                               args: [`-DInstrmt_DIR=${instrmt_dir}`, `-DVTUNE_ROOT=${ittapi_root}`, `-DTRACY_ROOT=${tracy_root}`]
                             }),
     cmake_build_command(build_dir, {cmake: cmake_bin})
-  ]
+  ];
 }
 
 function instrmt_configure_command(srcdir, builddir, {buildType, ittapi, tracy, googleBenchmark, vendorDir, args = []} = {}) {
@@ -727,7 +728,7 @@ program
                                                               ]
                                                             });
           task.title = shellquote.quote(configure_command);
-          return listr_execa_promise(task, configure_command, {quiet: options.quiet});
+          return listr_execa_promise(configure_command, {quiet: options.quiet});
         }
       },
       {
@@ -735,7 +736,7 @@ program
         task: (ctx, task) => {
           const build_command = cmake_build_command(ctx.instrmt_bld, {cmake: options.cmake, target: 'install'});
           task.title = shellquote.quote(build_command);
-          return listr_execa_promise(task, build_command, {quiet: options.quiet});
+          return listr_execa_promise(build_command, {quiet: options.quiet});
         }
       },
       {
@@ -758,7 +759,7 @@ program
       },
       {
         title: 'Cleanup',
-        task: (ctx) => { rimraf.sync(ctx.temp) }
+        task: (ctx) => { rimraf.sync(ctx.temp); }
       }
     ], {renderer: 'verbose'}).run();
   });
@@ -821,7 +822,7 @@ program
         {
           title: shellquote.quote(docker_command),
           task: () => execa(docker_command[0], docker_command.slice(1), {stdio: 'inherit'})
-            .catch(err => { throw new Listr.ListrError(`Command failed with exit code ${err.exitCode}`); })
+            .catch(err => { throw new Error(`Command failed with exit code ${err.exitCode}`); })
         }
       ], {renderer: 'verbose'}).run();
     } else {
