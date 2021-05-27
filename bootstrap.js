@@ -2,12 +2,12 @@
 "use strict;";
 
 const assert = require('assert');
-const chalk = require('chalk');
 const crypto = require('crypto');
 const execa = require('execa');
 const fs = require('fs');
 const fse = require('fs-extra');
-const glob = require("glob");
+const glob = require('glob');
+var hasbin = require('hasbin');
 const Listr = require('listr');
 const https = require('follow-redirects').https;
 const mkdirp = require('mkdirp');
@@ -172,17 +172,27 @@ function isDirectory(p) {
   return fs.existsSync(p) && fs.lstatSync(p).isDirectory();
 }
 
+function unbuffer(command) {
+  if (hasbin.sync('unbuffer')) {
+    return ['unbuffer', command];
+  } else {
+    return [command[0], command.slice(1)];
+  }
+}
+
 function listr_execa_promise(command, {quiet=false, env, cwd} = {}) {
-  assert(Array.isArray(command) && command.length > 1, 'Command is not a valid array');
+  assert(Array.isArray(command) && command.length > 0, 'Command is not a valid array');
 
   let p = quiet
-    ? execa('unbuffer', [...command], {env, cwd, all: true})
+    ? execa(...unbuffer(command), {env, cwd, all: true})
     : execa(command[0], command.slice(1), {env, cwd, stdio: 'inherit'});
 
   return p
     .catch(err => {
-      if (err.all) console.log(err.all);
-      throw new Error(`Command failed with exit code ${err.exitCode}`);
+      if (err.exitCode) {
+        if (err.all) console.log(err.all);
+        throw new Error(`Command failed with exit code ${err.exitCode}`);
+      } else throw err;
     });
 }
 
