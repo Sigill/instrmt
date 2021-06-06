@@ -349,10 +349,16 @@ function fetch_capstone_task({directory = requiredArg('directory'), version = re
         ...download_and_extract_tasks(url, archive, checksum, dirs.src, {strip_components: 1}),
         execa_task(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')]),
         execa_task(
-          cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF', '-DCAPSTONE_BUILD_SHARED=OFF']}),
+          cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']}),
           {pre: () => mkdirp(dirs.build)}
         ),
-        execa_task(cmake_build_command(dirs.build, {target: 'install'})),
+        execa_task(
+          cmake_build_command(dirs.build, {target: 'install'}),
+          {
+            // Drop the dynamic libraries in order to force the use of the static ones when building tracy's capture & profiler.
+            post: () => glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f))
+          }
+        ),
         cleanup_task(dirs.temp)
       ];
 
