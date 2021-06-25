@@ -1,24 +1,29 @@
 #!/usr/bin/env node
 "use strict;";
 
+// See https://github.com/gajus/global-agent for proxy configuration
+require('global-agent').bootstrap();
+
 const assert = require('assert');
 const crypto = require('crypto');
 const execa = require('execa');
 const fs = require('fs');
 const fse = require('fs-extra');
 const glob = require('glob');
+const got = require('got');
 const hasbin = require('hasbin');
 const {Listr} = require('listr2');
-const https = require('follow-redirects').https;
 const mkdirp = require('mkdirp');
 const os = require('os');
 const {paramCase} = require('param-case');
 const path = require('path');
 const pathIsInside = require('path-is-inside');
+const {promisify} = require('util');
 const replaceInFile = require('replace-in-file');
 const rimraf = require('rimraf');
 const semver = require('semver');
 const shellquote = require('shell-quote');
+const stream = require('stream');
 const tar = require('tar');
 const commander = require('commander');
 
@@ -79,39 +84,6 @@ async function md5sum(file) {
     stream.on('error', err => reject(err));
     stream.on('data', chunk => hash.update(chunk));
     stream.on('end', () => resolve(hash.digest('hex')));
-  });
-}
-
-async function download(url, dest) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-
-    const request = https.get(url, (response) => {
-      if (response.statusCode === 200) {
-        response.pipe(file);
-      } else {
-        reject('Response status was ' + response.statusCode);
-      }
-    });
-
-    file.on('finish', () => {
-      file.close(err => {
-        if (err)
-          reject(err);
-        else
-          resolve(dest);
-      });
-    });
-
-    request.on('error', (err) => {
-      rimraf.sync(dest);
-      reject(err.message);
-    });
-
-    file.on('error', (err) => {
-      rimraf.sync(dest);
-      reject(err.message);
-    });
   });
 }
 
@@ -243,10 +215,11 @@ function execa_task(command, {title, skip, enabled, env, cwd} = {}) {
 }
 
 function download_task(url, file) {
+  const pipeline = promisify(stream.pipeline);
   return {
-    title: `Download ${url}`,
+    title: `Download ${url} to ${file}`,
     skip: (ctx) => fs.existsSync(file) && (ctx.quiet || `${file} already exists`),
-    task: () => mkdirp(path.dirname(file)).then(() => download(url, file))
+    task: () => mkdirp(path.dirname(file)).then(() => pipeline(got.stream(url), fs.createWriteStream(file)))
   };
 }
 
