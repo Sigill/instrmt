@@ -541,7 +541,7 @@ const dependencies = {
 };
 
 function dependency(name, version) {
-  assert(dependencies[name], 'Unknown dependency');
+  assert(dependencies[name], `Unknown dependency ${name}`);
   version ||= dependencies[name].default_version;
 
   return {
@@ -562,100 +562,66 @@ function dependency(name, version) {
 
 const program = new commander.Command();
 
-class FetchCommand {
-  constructor(name, pretty_name) {
-    this.name = name;
+function FetchCommand(name, pretty_name, {version, suffix, checksum, cmakeBuildType} = {}) {
+  const cmd = program
+    .command(`fetch-${name}`)
+    .description(`Fetch ${pretty_name || name}.`)
+    .option('-C, --directory <directory>', 'Change to DIR before performing any operations.', absolute_path,
+            __dirname === process.cwd() ? path.join(process.cwd(), 'vendor') : process.cwd())
+    .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).');
 
-    this.optionsPostProcessors = [];
-
-    this.cmd = program
-      .command(`fetch-${this.name}`)
-      .description(`Fetch ${pretty_name || name}.`)
-      .option('-C, --directory <directory>', 'Change to DIR before performing any operations.', absolute_path,
-              __dirname === process.cwd() ? path.join(process.cwd(), 'vendor') : process.cwd())
-      .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).');
+  if (version) {
+    cmd.option('-v, --version <value>', 'Overrides version.', dependency(name).version());
   }
 
-  optionsPostProcessor(fn) { this.optionsPostProcessors.push(fn); return this;}
-
-  versionOption() {
-    this.cmd.option('-v, --version <value>', 'Overrides version.', dependency(this.name).version());
-    return this;
+  if (suffix) {
+    cmd.option('-s, --suffix <value>', 'Suffix to append on directory name.');
   }
 
-  suffixOption() {
-    this.cmd.option('-s, --suffix <value>', 'Suffix to append on directory name.');
-    return this;
-  }
+  if (checksum) {
+    assert(version, '"checkum" option requires "version" option');
 
-  checksumOption() {
-    this.cmd.option('-c, --checksum <value>', 'Overrides checksum.');
-    this.optionsPostProcessor((options) => { options.checksum ??= dependency(this.name, options.version).checksum(); });
-    return this;
-  }
-
-  cmakeBuildtypeOption() {
-    this.cmd.option('--cmake-build-type <value>', 'Overrides CMAKE_BUILD_TYPE.', 'Release');
-    return this;
-  }
-
-  option(...args) { this.cmd.option(...args); return this; }
-
-  addOption(opt) { this.cmd.addOption(opt); return this; }
-
-  action(fn) {
-    this.cmd.action(async (options) => {
-      this.optionsPostProcessors.forEach(p => p(options));
-      await fn(options);
+    cmd.option('-c, --checksum <value>', 'Overrides checksum.');
+    cmd.hook('preAction', (thisCommand, actionCommand) => {
+      actionCommand.opts().checksum ??= dependency(name, actionCommand.opts().version).checksum();
     });
   }
+
+  if (cmakeBuildType) {
+    cmd.option('--cmake-build-type <value>', 'Overrides CMAKE_BUILD_TYPE.', 'Release');
+  }
+
+  return cmd;
 }
 
-new FetchCommand('cmake28', 'CMake 2.8.12')
+FetchCommand('cmake28', 'CMake 2.8.12')
   .action((options) => run_tasks(fetch_cmake28_task(options), options));
 
-new FetchCommand('cmake3', 'CMake 3.x')
-  .versionOption()
-  .checksumOption()
+FetchCommand('cmake3', 'CMake 3.x', {version: true, checksum: true})
   .action((options) => run_tasks(fetch_cmake3_task(options), options));
 
-new FetchCommand('ittapi', 'ITT API')
-  .versionOption()
-  .suffixOption()
-  .checksumOption()
-  .cmakeBuildtypeOption()
+FetchCommand('ittapi', 'ITT API', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_ittapi_task(options), options));
 
-new FetchCommand('capstone', 'Capstone')
-  .versionOption()
-  .suffixOption()
-  .checksumOption()
-  .cmakeBuildtypeOption()
+FetchCommand('capstone', 'Capstone', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_capstone_task(options), options));
 
-new FetchCommand('glfw', 'GLFW')
-  .versionOption()
-  .suffixOption()
-  .checksumOption()
-  .cmakeBuildtypeOption()
+FetchCommand('glfw', 'GLFW', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_glfw_task(options), options));
 
-new FetchCommand('tracy', 'Tracy')
-  .versionOption()
-  .suffixOption()
-  .checksumOption()
+FetchCommand('tracy', 'Tracy', {version: true, suffix: true, checksum: true})
   .addOption(new commander.Option('--components <value...>', 'Components to build.').choices(['lib', 'capture', 'profiler']).default(['lib']))
   .option('--with-glfw <directory>', 'Root directory of glfw (location of lib/pkgconfig/glfw3.pc).')
-  .optionsPostProcessor((options) => { options.withGlfw ??= dependency('glfw').path(options.directory); })
+  .hook('preAction', (thisCommand, actionCommand) => {
+    actionCommand.opts().withGlfw ??= dependency('glfw').path(actionCommand.opts().directory);
+  })
   .option('--with-capstone <directory>', 'Root directory of capstone (location of lib/pkgconfig/capstone.pc).')
-  .optionsPostProcessor((options) => { options.withCapstone ??= dependency('capstone').path(options.directory); })
+  .hook('preAction', (thisCommand, actionCommand) => {
+    actionCommand.opts().withCapstone ??= dependency('capstone').path(actionCommand.opts().directory);
+  })
   .action((options) => run_tasks(fetch_tracy_task(options), options));
 
-new FetchCommand('google-benchmark')
-  .versionOption()
-  .suffixOption()
-  .checksumOption()
-  .cmakeBuildtypeOption()
+FetchCommand('google-benchmark', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_google_benchmark_task(options), options));
 
 program
