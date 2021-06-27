@@ -1,4 +1,9 @@
 {
+  "parser": "babel-eslint",
+  "parserOptions": {
+    "sourceType": "module",
+    "allowImportExportEverywhere": true
+  },
   "env": {
     "node": true,
     "commonjs": true,

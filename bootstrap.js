@@ -1,30 +1,34 @@
 #!/usr/bin/env node
-"use strict;";
 
 // See https://github.com/gajus/global-agent for proxy configuration
-require('global-agent').bootstrap();
+import * as global_agent from 'global-agent';
+global_agent.bootstrap();
 
-const assert = require('assert');
-const crypto = require('crypto');
-const execa = require('execa');
-const fs = require('fs');
-const fse = require('fs-extra');
-const glob = require('glob');
-const got = require('got');
-const hasbin = require('hasbin');
-const mkdirp = require('mkdirp');
-const os = require('os');
-const {paramCase} = require('param-case');
-const path = require('path');
-const pathIsInside = require('path-is-inside');
-const {promisify} = require('util');
-const replaceInFile = require('replace-in-file');
-const rimraf = require('rimraf');
-const semver = require('semver');
-const shellquote = require('shell-quote');
-const stream = require('stream');
-const tar = require('tar');
-const commander = require('commander');
+import assert from 'assert';
+import crypto from 'crypto';
+import execa from 'execa';
+import fs from 'fs';
+import * as fse from 'fs-extra';
+import glob from 'glob';
+import got from 'got';
+import isInteractive from 'is-interactive';
+import hasbin from 'hasbin';
+import mkdirp from 'mkdirp';
+import os from 'os';
+import {paramCase} from 'param-case';
+import path from 'path';
+import pathIsInside from 'path-is-inside';
+import {promisify} from 'util';
+import replaceInFile from 'replace-in-file';
+import rimraf from 'rimraf';
+import semver from 'semver';
+import shellquote from 'shell-quote';
+import stream from 'stream';
+import tar from 'tar';
+import commander from 'commander';
+
+// https://techsparx.com/nodejs/esnext/dirname-es-modules.html
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 function isPromise(obj) {
   return obj instanceof Promise;
@@ -844,7 +848,7 @@ function start_ci_container(options) {
 
   const shellFlags = function*() {
     if (options.shell) yield '-i';
-    if (options.shell || process.stdout.isTTY) yield '-t';
+    if (options.shell || isInteractive()) yield '-t';
   };
 
   const docker_command = [
