@@ -838,8 +838,13 @@ function start_ci_container(options) {
   if (options.shell)
     command_string = `${command_string} ; bash`;
 
+  const shellFlags = function*() {
+    if (options.shell) yield '-i';
+    if (options.shell || process.stdout.isTTY) yield '-t';
+  };
+
   const docker_command = [
-    'docker', 'run', '--rm', (options.shell ? '-it' : '-t'), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
+    'docker', 'run', '--rm', ...shellFlags(), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
     'instrmt-build',
     'bash', '-c', command_string
   ];
