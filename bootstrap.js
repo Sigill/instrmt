@@ -304,7 +304,7 @@ function fetch_ittapi_task({directory = requiredArg('directory'), version = requ
     task: (ctx, task) => task.newListr([
       ...download_and_extract_tasks(url, archive, checksum, dirs.src, {strip_components: 1}),
       execa_task(
-        cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, args: []})
+        cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []})
       ),
       execa_task(cmake_build_command(dirs.build)),
       {
@@ -335,7 +335,7 @@ function fetch_capstone_task({directory = requiredArg('directory'), version = re
       ...download_and_extract_tasks(url, archive, checksum, dirs.src, {strip_components: 1}),
       execa_task(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')]),
       execa_task(
-        cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']})
+        cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']})
       ),
       execa_task(
         cmake_build_command(dirs.build, {target: 'install'})
@@ -365,7 +365,7 @@ function fetch_glfw_task({directory = requiredArg('directory'), version = requir
         cmake_configure_command(
           dirs.src, dirs.build,
           {
-            cmakeBuildType, installPrefix: dirs.install,
+            buildType: cmakeBuildType, installPrefix: dirs.install,
             args: ['-DGLFW_BUILD_DOCS=OFF', '-DGLFW_BUILD_EXAMPLES=OFF', '-DGLFW_BUILD_TESTS=OFF']
           }
         )
@@ -494,7 +494,7 @@ function fetch_google_benchmark_task({directory = requiredArg('directory'), vers
         ...download_and_extract_tasks(url, archive, checksum, dirs.src, {strip_components: 1}),
         execa_task(
           cmake_configure_command(dirs.src, dirs.build,
-                                  {cmakeBuildType, installPrefix: dirs.install, args: ['-DBENCHMARK_ENABLE_TESTING=OFF']})
+                                  {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DBENCHMARK_ENABLE_TESTING=OFF']})
         ),
         execa_task(cmake_build_command(dirs.build, {target: 'install'})),
         cleanup_task(dirs.temp)
@@ -562,7 +562,7 @@ function dependency(name, version) {
 
 const program = new commander.Command();
 
-function FetchCommand(name, pretty_name, {version, suffix, checksum, cmakeBuildType} = {}) {
+function FetchCommand(name, {pretty_name, version, suffix, checksum, cmakeBuildType} = {}) {
   const cmd = program
     .command(`fetch-${name}`)
     .description(`Fetch ${pretty_name || name}.`)
@@ -594,22 +594,22 @@ function FetchCommand(name, pretty_name, {version, suffix, checksum, cmakeBuildT
   return cmd;
 }
 
-FetchCommand('cmake28', 'CMake 2.8.12')
+FetchCommand('cmake28', {pretty_name: 'CMake 2.8.12'})
   .action((options) => run_tasks(fetch_cmake28_task(options), options));
 
-FetchCommand('cmake3', 'CMake 3.x', {version: true, checksum: true})
+FetchCommand('cmake3', {pretty_name: 'CMake 3.x', version: true, checksum: true})
   .action((options) => run_tasks(fetch_cmake3_task(options), options));
 
-FetchCommand('ittapi', 'ITT API', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
+FetchCommand('ittapi', {pretty_name: 'ITT API', version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_ittapi_task(options), options));
 
-FetchCommand('capstone', 'Capstone', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
+FetchCommand('capstone', {pretty_name: 'Capstone', version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_capstone_task(options), options));
 
-FetchCommand('glfw', 'GLFW', {version: true, suffix: true, checksum: true, cmakeBuildType: true})
+FetchCommand('glfw', {pretty_name: 'GLFW', version: true, suffix: true, checksum: true, cmakeBuildType: true})
   .action((options) => run_tasks(fetch_glfw_task(options), options));
 
-FetchCommand('tracy', 'Tracy', {version: true, suffix: true, checksum: true})
+FetchCommand('tracy', {pretty_name: 'Tracy', version: true, suffix: true, checksum: true})
   .addOption(new commander.Option('--components <value...>', 'Components to build.').choices(['lib', 'capture', 'profiler']).default(['lib']))
   .option('--with-glfw <directory>', 'Root directory of glfw (location of lib/pkgconfig/glfw3.pc).')
   .hook('preAction', (thisCommand, actionCommand) => {
@@ -631,9 +631,9 @@ program
           __dirname === process.cwd() ? path.join(process.cwd(), 'vendor') : process.cwd())
   .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).')
   .action(async (options) => run_tasks([
-    fetch_ittapi_task({directory: options.directory, version: dependency('ittapi').version(), checksum: dependency('ittapi').checksum()}),
+    fetch_ittapi_task({directory: options.directory, version: dependency('ittapi').version(), checksum: dependency('ittapi').checksum(), cmakeBuildType: 'Release'}),
     fetch_tracy_task({directory: options.directory, version: dependency('tracy').version(), checksum: dependency('tracy').checksum(), components: ['lib']}),
-    fetch_google_benchmark_task({directory: options.directory, version: dependency('google-benchmark').version(), checksum: dependency('google-benchmark').checksum()})
+    fetch_google_benchmark_task({directory: options.directory, version: dependency('google-benchmark').version(), checksum: dependency('google-benchmark').checksum(), cmakeBuildType: 'Release'})
   ], options));
 
 function instrmt_configure_command(srcdir, builddir, {cmake, buildType, installPrefix, ittapi, tracy, googleBenchmark, vendorDir, enableTests=true, args = []} = {}) {
