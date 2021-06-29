@@ -6,6 +6,7 @@ global_agent.bootstrap();
 
 import assert from 'assert';
 import crypto from 'crypto';
+import dargs from 'dargs';
 import execa from 'execa';
 import fs from 'fs';
 import * as fse from 'fs-extra';
@@ -15,7 +16,6 @@ import isInteractive from 'is-interactive';
 import hasbin from 'hasbin';
 import mkdirp from 'mkdirp';
 import os from 'os';
-import {paramCase} from 'param-case';
 import path from 'path';
 import pathIsInside from 'path-is-inside';
 import {promisify} from 'util';
@@ -794,27 +794,6 @@ function docker_volumes() {
   return execa.sync('docker', ['volume', 'ls']).stdout.split('\n').slice(1).map(l => l.split(/ +/)[1]);
 }
 
-function optgen(options) {
-  return {
-    unary: function* (...names) {
-      for(const name of names)
-        if (options[name]) yield `--${paramCase(name)}`;
-    },
-    negated: function* (...names) {
-      for(const name of names)
-        if (!options[name]) yield `--no-${paramCase(name)}`;
-    },
-    valued: function* (...names) {
-      for(const name of names) {
-        if (options[name]) {
-          yield `--${paramCase(name)}`;
-          yield* as_array(options[name]);
-        }
-      }
-    }
-  };
-}
-
 function start_ci_container(options) {
   const branch = execa.sync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
 
@@ -833,12 +812,11 @@ function start_ci_container(options) {
   if (!options.fast)
     commands.push(`${step_exe} npm i --production --prefer-offline --no-audit --progress=false`);
 
-  const og = optgen(options);
   commands.push(shellquote.quote([
     'step', 'node', 'bootstrap.js', 'ci', // Not step -q otherwise there would be no output
-    ...og.unary('fast', 'warningAsError', 'quiet'),
-    ...og.negated('fullBuild', 'cmakeIntegration', 'runTests'),
-    ...og.valued('cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion')
+    ...dargs(options, {includes: ['fast', 'warningAsError', 'quiet'], ignoreFalse: true}),
+    ...dargs(options, {includes: ['fullBuild', 'cmakeIntegration', 'runTests'], ignoreTrue: true}),
+    ...dargs(options, {includes: ['cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion']}),
   ]));
 
   let command_string = commands.join(' && ');
