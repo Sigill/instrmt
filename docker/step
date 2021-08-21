@@ -1,8 +1,5 @@
 #!/bin/bash
 
-PRETTY=
-test -t 1 && PRETTY=pretty
-
 has_unbuffer() {
     command -v unbuffer >/dev/null 2>&1
 }
@@ -12,53 +9,65 @@ now_ms() {
 }
 
 elapsed_time() {
-    bc -q <<< "scale=1; ($2 - $1 + 0.05) * 10 / 10"
+    echo "$1 $2" | awk '{printf "%.1f", $2-$1}'
 }
 
-QUIET=
+quote_command() {
+    # @Q expansion appeared in bash 4.4, but it's ugly.
+    command -v shell-quote >/dev/null 2>&1 && shell-quote "$@" || echo "${@@Q}"
+}
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-    -q)
-        QUIET=y
-        shift
-        ;;
-    *)
-        break
-        ;;
-    esac
-done
+main() {
+    local USE_COLOR=
+    test -t 1 && USE_COLOR=y
 
-command -v shell-quote >/dev/null 2>&1 && quoted_command=$(shell-quote "$@") || quoted_command="${@@Q}"
+    local QUIET=
 
-time_start=$(now_ms)
-echo "[STARTED] $quoted_command"
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -q)
+            QUIET=y
+            shift
+            ;;
+        *)
+            break # Stop at first unknown argument, this is the command.
+            ;;
+        esac
+    done
 
-if [ "$QUIET" = y ]; then
-    TMPFILE=$(mktemp) || exit 1
-    trap 'rm -f "$TMPFILE"' EXIT
+    local quoted_command=$(quote_command "$@")
 
-    if [ -n "$PRETTY" -a has_unbuffer ]; then
-        unbuffer "$@" &> "$TMPFILE"
+    local time_start=$(now_ms)
+    echo "[STARTED] $quoted_command"
+
+    if [ "$QUIET" = y ]; then
+        local TMPFILE=$(mktemp) || exit 1
+        trap 'rm -f "$TMPFILE"' EXIT
+
+        if [ "$USE_COLOR" = y -a has_unbuffer ]; then
+            unbuffer "$@" &> "$TMPFILE"
+        else
+            "$@" &> "$TMPFILE"
+        fi
+        local status=$?
+
+        if [ $status -ne 0 ]; then
+            cat "$TMPFILE"
+        fi
     else
-        "$@" &> "$TMPFILE"
+        "$@"
+        local status=$?
     fi
-    status=$?
 
-    if [ $status -ne 0 ]; then
-        cat "$TMPFILE"
+    local time_end=$(now_ms)
+
+    if [ $status -eq 0 ]; then
+        echo "[SUCCESS] $quoted_command [$(elapsed_time $time_start $time_end)s]"
+    else
+        echo "[FAILED] $quoted_command [$(elapsed_time $time_start $time_end)s]"
     fi
-else
-    "$@"
-    status=$?
-fi
 
-time_end=$(now_ms)
+    exit $status
+}
 
-if [ $status -eq 0 ]; then
-    echo "[SUCCESS] $quoted_command [$(elapsed_time $time_start $time_end)s]"
-else
-    echo "[FAILED] $quoted_command [$(elapsed_time $time_start $time_end)s]"
-fi
-
-exit $status
+main "$@"
