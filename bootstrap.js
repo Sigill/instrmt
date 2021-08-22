@@ -816,8 +816,11 @@ function start_ci_container(options) {
 
   let command_string = commands.join(' && ');
 
-  if (options.shell)
+  if (options.shell) {
+    if (!isInteractive())
+      throw new Error('Host terminal is not a TTY, the --shell option cannot be used.');
     command_string = `${command_string} ; bash`;
+  }
 
   const shellFlags = function*() {
     if (options.shell) yield '-i';
