@@ -790,21 +790,16 @@ program
     steps(options).cleanup(temp);
   });
 
-function docker_volumes() {
-  return execa.sync('docker', ['volume', 'ls']).stdout.split('\n').slice(1).map(l => l.split(/ +/)[1]);
-}
-
 function start_ci_container(options) {
   const branch = execa.sync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
 
-  if (!docker_volumes().includes('instrmt-build-cache')) {
-    execa.sync('docker', ['docker', 'volume', 'create', 'instrmt-build-cache']);
-  }
+  execa.sync('docker', ['volume', 'create', 'instrmt-build-cache']);
 
   const step_exe = options.quiet ? `step -q` : `step`;
 
   const commands = [
     `${step_exe} git clone --depth 1 -b ${branch} /repo /src`,
+    `${step_exe} mkdir -p /cache/node_modules /cache/vendor`,
     `${step_exe} ln -snf /cache/node_modules /src/node_modules`,
     `${step_exe} ln -snf /cache/vendor /src/vendor`
   ];
