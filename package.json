@@ -9,6 +9,7 @@
     "global-agent": "^2.2.0",
     "got": "^11.8.2",
     "hasbin": "^1.2.3",
+    "hasha": "^5.2.2",
     "is-interactive": "^2.0.0",
     "mkdirp": "^1.0.4",
     "p-is-promise": "^4.0.0",

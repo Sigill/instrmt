@@ -5,7 +5,6 @@ import * as global_agent from 'global-agent';
 global_agent.bootstrap();
 
 import assert from 'assert';
-import crypto from 'crypto';
 import dargs from 'dargs';
 import execa from 'execa';
 import fs from 'fs';
@@ -15,6 +14,7 @@ import got from 'got';
 import isInteractive from 'is-interactive';
 import isPromise from 'p-is-promise';
 import hasbin from 'hasbin';
+import hasha from 'hasha';
 import mkdirp from 'mkdirp';
 import os from 'os';
 import path from 'path';
@@ -79,16 +79,6 @@ function resolve_directories(basename, workdir, { buildInSource = false, skipIns
       };
     }
   }
-}
-
-function md5sum(file) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('md5');
-    const stream = fs.createReadStream(file);
-    stream.on('error', err => reject(err));
-    stream.on('data', chunk => hash.update(chunk));
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
 }
 
 function nproc() { return os.cpus().length; }
@@ -299,10 +289,13 @@ function steps({quiet} = {}) {
       return step({
         title: `Verify checksum of ${file}`,
         skip: () => !expected_checksum && (quiet || 'Checksum not specified'),
-        action: () => md5sum(file).then(actual_checksum => {
-          if (actual_checksum !== expected_checksum)
-            throw new Error(`md5(${file}) = ${actual_checksum} != ${expected_checksum}`);
-        })
+        action: () => {
+          const {algorithm, hash: expected_hash} = expected_checksum;
+          return hasha.fromFile(file, {algorithm}).then(actual_hash => {
+            if (actual_hash !== expected_hash)
+              throw new Error(`${algorithm}(${file}) = ${actual_hash} != ${expected_hash}`);
+          });
+        }
       });
     },
     extract: function(archive, dest, {strip_components} = {}) {
@@ -614,28 +607,28 @@ const dependencies = {
   cmake3: {
     basename: 'cmake',
     default_version: '3.20.0',
-    '3.20.0': { checksum: '9775844c038dd0b2ed80bce4747ba6bf' }
+    '3.20.0': { checksum: { algorithm: 'md5', hash: '9775844c038dd0b2ed80bce4747ba6bf' } }
   },
   ittapi: {
     default_version: '8cd2618',
-    '8cd2618': { checksum: '5920c512a7a7c8971f2ffe6f693ffff3' }
+    '8cd2618': { checksum: { algorithm: 'md5', hash: '5920c512a7a7c8971f2ffe6f693ffff3' } }
   },
   capstone: {
     default_version: '4.0.2',
-    '4.0.2': { checksum: '8894344c966a948f1248e66c91b53e2c' }
+    '4.0.2': { checksum: { algorithm: 'md5', hash: '8894344c966a948f1248e66c91b53e2c' } }
   },
   glfw: {
     default_version: '3.3.4',
-    '3.3.4': { checksum: '8f8e5e931ef61c6a8e82199aabffe65a' }
+    '3.3.4': { checksum: { algorithm: 'md5', hash: '8f8e5e931ef61c6a8e82199aabffe65a' } }
   },
   tracy: {
     default_version: 'v0.7.6',
-    'v0.7.2': { checksum: 'bceb615c494c3f7ccb77ba3bae20b216' },
-    'v0.7.6': { checksum: '828be21907a1bddf5762118cf9e3ff66' }
+    'v0.7.2': { checksum: { algorithm: 'md5', hash: 'bceb615c494c3f7ccb77ba3bae20b216' } },
+    'v0.7.6': { checksum: { algorithm: 'md5', hash: '828be21907a1bddf5762118cf9e3ff66' } }
   },
   'google-benchmark': {
     default_version: 'v1.5.3',
-    'v1.5.3': { checksum: 'abb43ef7784eaf0f7a98aed560920f46' }
+    'v1.5.3': { checksum: { algorithm: 'md5', hash: 'abb43ef7784eaf0f7a98aed560920f46' } }
   }
 };
 
