@@ -13,6 +13,7 @@ import * as fse from 'fs-extra';
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
+import isPromise from 'p-is-promise';
 import hasbin from 'hasbin';
 import mkdirp from 'mkdirp';
 import os from 'os';
@@ -29,10 +30,6 @@ import commander from 'commander';
 
 // https://techsparx.com/nodejs/esnext/dirname-es-modules.html
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
-
-function isPromise(obj) {
-  return obj instanceof Promise;
-}
 
 function as_array(arg) {
   if (Array.isArray(arg))
