@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
 
-#include <instrmt-benchmarks-functions2.hxx>
+#include "instrmt-benchmarks-functions2.hxx"
 
 void bm_function1000(benchmark::State& state) {
   for(auto _ : state) {

@@ -1,0 +1,20 @@
+add_executable(instrmt-test-cpp ../example/example.cpp)
+target_compile_definitions(instrmt-test-cpp PRIVATE INSTRMT_ENABLE)
+target_link_libraries(instrmt-test-cpp PRIVATE instrmt)
+add_test(NAME instrmt-test-cpp COMMAND instrmt-test-cpp)
+
+add_executable(instrmt-test-cpp-tty ../example/example.cpp)
+target_link_libraries(instrmt-test-cpp-tty instrmt-tty-wrapper)
+add_test(NAME instrmt-test-cpp-tty COMMAND instrmt-test-cpp-tty)
+
+if (INSTRMT_BUILD_ITT_ENGINE)
+  add_executable(instrmt-test-cpp-itt ../example/example.cpp)
+  target_link_libraries(instrmt-test-cpp-itt instrmt-itt-wrapper)
+  add_test(NAME instrmt-test-cpp-itt COMMAND instrmt-test-cpp-itt)
+endif()
+
+if (INSTRMT_BUILD_TRACY_ENGINE)
+  add_executable(instrmt-test-cpp-tracy ../example/example.cpp)
+  target_link_libraries(instrmt-test-cpp-tracy instrmt-tracy-wrapper)
+  add_test(NAME instrmt-test-cpp-tracy COMMAND instrmt-test-cpp-tracy)
+endif()

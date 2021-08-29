@@ -1,6 +1,5 @@
-get_filename_component(PACKAGE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-set(INSTRMT_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+@PACKAGE_INIT@
 
-if(NOT TARGET instrmt)
-  include("${PACKAGE_CMAKE_DIR}/@INSTRMT_EXPORT@.cmake")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/InstrmtTargets.cmake")
+
+check_required_components(Instrmt)

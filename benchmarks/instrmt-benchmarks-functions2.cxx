@@ -1,4 +1,4 @@
-#include <instrmt-benchmarks-functions.hxx>
+#include "instrmt-benchmarks-functions.hxx"
 
 void function1000() {
   f1();

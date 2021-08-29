@@ -1,0 +1,69 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "minimal",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "INSTRMT_BUILD_ITT_ENGINE": false,
+        "INSTRMT_BUILD_TRACY_ENGINE": false,
+        "BUILD_TESTING": false,
+        "BUILD_BENCHMARKS": false
+      }
+    },
+    {
+      "name": "default",
+      "inherits": "minimal",
+      "cacheVariables": {
+        "INSTRMT_BUILD_ITT_ENGINE": true,
+        "INSTRMT_BUILD_TRACY_ENGINE": true,
+        "BUILD_TESTING": true,
+        "BUILD_BENCHMARKS": false,
+        "VTUNE_ROOT": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/ittapi-8cd2618"
+        },
+        "TRACY_ROOT": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/tracy-0.7.6"
+        }
+      }
+    },
+    {
+      "name": "full",
+      "inherits": "default",
+      "cacheVariables": {
+        "BUILD_BENCHMARKS": true,
+        "benchmark_DIR": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/google-benchmark-1.5.3/lib/cmake/benchmark"
+        }
+      }
+    },
+    {
+      "name": "latest",
+      "inherits": "full",
+      "binaryDir": "${sourceDir}/build-latest",
+      "cacheVariables": {
+        "VTUNE_ROOT": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/ittapi-master"
+        },
+        "TRACY_ROOT": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/tracy-master"
+        },
+        "benchmark_DIR": {
+          "type": "PATH",
+          "value": "${sourceDir}/vendor/google-benchmark-master/lib/cmake/benchmark"
+        }
+      }
+    }
+  ]
+}

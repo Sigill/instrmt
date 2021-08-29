@@ -1,113 +1,96 @@
-cmake_minimum_required(VERSION 2.8.12)
-project(Instrmt)
+cmake_minimum_required(VERSION 3.14)
 
-set(INSTRMT_VERSION "0.1.0")
+include(cmake/in-source-guard.cmake)
 
-include(GNUInstallDirs)
-set(CMAKE_INSTALL_CMAKEDIR "lib/cmake/instrmt" CACHE PATH "Install location for cmake related files")
-mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
+cmake_policy(SET CMP0048 NEW)
 
-include(CMakePackageConfigHelpers)
-include(CTest)
+project(
+  Instrmt
+  VERSION 0.1.0
+  LANGUAGES CXX
+)
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
-include(instrmt)
+include(cmake/instrmt-macros.cmake)
 
+# For convenience, write libraries and executables in root of build tree.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-set(INSTRMT_EXPORT InstrmtTargets)
-
-function(instrmt_export_install_targets)
-    install(TARGETS ${ARGN}
-        EXPORT ${INSTRMT_EXPORT}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-endfunction()
-
-function(instrmt_install_target e)
-    install(TARGETS ${e} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endfunction()
-
+# Main library
 add_library(instrmt SHARED
-    instrmt/details/engine.cxx
-    instrmt/details/utils.cxx)
-
-set(INSTRMT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
+  instrmt/details/engine.cxx
+  instrmt/details/utils.cxx)
 
 target_include_directories(instrmt
-    PUBLIC $<BUILD_INTERFACE:${INSTRMT_INCLUDE_DIRS}>
-           $<INSTALL_INTERFACE:include>)
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+       $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(instrmt PRIVATE dl)
 
-if(BUILD_TESTING)
-    add_executable(example-cpp example/example.cpp)
-    target_compile_definitions(example-cpp PRIVATE INSTRMT_ENABLE)
-    target_link_libraries(example-cpp PRIVATE instrmt)
-endif()
+# TTY engine
+add_library(instrmt-tty MODULE instrmt/tty/tty-engine.cxx)
+target_link_libraries(instrmt-tty PRIVATE instrmt)
 
-install(FILES
-    instrmt/instrmt.hxx
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt)
+# TTY wrapper
+add_library(instrmt-tty-wrapper INTERFACE)
+target_include_directories(instrmt-tty-wrapper
+  INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
+target_compile_definitions(instrmt-tty-wrapper INTERFACE "INSTRMT_CXX_WRAPPER=\"instrmt/tty/tty-wrapper.hxx\"")
 
-install(FILES
-    instrmt/details/utils.h
-    instrmt/details/utils.hxx
-    instrmt/details/base.hxx
-    instrmt/details/engine.hxx
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/instrmt/details)
-
-instrmt_export_install_targets(instrmt)
-
-# Create the export file for the build tree.
-export(TARGETS instrmt FILE "${PROJECT_BINARY_DIR}/${INSTRMT_EXPORT}.cmake")
-# Create the export file for the install tree.
-install(EXPORT ${INSTRMT_EXPORT} DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
-
-# The config files could be generated using a macro (see [1]), but it seems
-# to be more complex than to do it manually (see [2]).
-# [1] https://cmake.org/cmake/help/latest/module/CMakePackageConfigHelpers.html
-# [2] https://gitlab.kitware.com/cmake/community/wikis/doc/tutorials/How-to-create-a-ProjectConfig.cmake-file
-
-# Create the config file for the build tree.
-set(CONF_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
-configure_file(InstrmtConfig.in.cmake
-    "${PROJECT_BINARY_DIR}/InstrmtConfig.cmake" @ONLY)
-
-# Create the config file for the install tree.
-set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/../../../${CMAKE_INSTALL_INCLUDEDIR}")
-configure_file(InstrmtConfig.in.cmake
-    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake" @ONLY)
-
-# Create the package version file.
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/InstrmtConfigVersion.cmake"
-    VERSION "${INSTRMT_VERSION}"
-    COMPATIBILITY SameMajorVersion)
-
-# Install both the config and version file.
-install(FILES
-    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/InstrmtConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/InstrmtConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
-
-add_subdirectory(instrmt/tty)
-
-option(INSTRMT_BUILD_TRACY_ENGINE "" OFF)
-if (INSTRMT_BUILD_TRACY_ENGINE)
-    find_tracy()
-endif()
-add_subdirectory(instrmt/tracy)
-
-option(INSTRMT_BUILD_ITT_ENGINE "" OFF)
+option(INSTRMT_BUILD_ITT_ENGINE "" ON)
 if (INSTRMT_BUILD_ITT_ENGINE)
-    find_itt()
-endif()
-add_subdirectory(instrmt/itt)
+  find_itt()
 
-option(BUILD_BENCHMARKS "" OFF)
+  # ITT engine
+  add_library(instrmt-itt MODULE instrmt/itt/itt-engine.cxx)
+  target_link_libraries(instrmt-itt PRIVATE instrmt ittnotify)
+
+  # ITT wrapper
+  add_library(instrmt-itt-wrapper INTERFACE)
+  target_include_directories(instrmt-itt-wrapper
+    INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_compile_definitions(instrmt-itt-wrapper INTERFACE "INSTRMT_CXX_WRAPPER=\"instrmt/itt/itt-wrapper.hxx\"")
+  target_link_libraries(instrmt-itt-wrapper INTERFACE ittnotify)
+endif()
+
+option(INSTRMT_BUILD_TRACY_ENGINE "" ON)
+if (INSTRMT_BUILD_TRACY_ENGINE)
+  find_tracy()
+
+  # Tracy engine
+  add_library(instrmt-tracy MODULE instrmt/tracy/tracy-engine.cxx)
+  target_link_libraries(instrmt-tracy PRIVATE instrmt tracy)
+
+  # Tracy wrapper
+  add_library(instrmt-tracy-wrapper INTERFACE)
+  target_include_directories(instrmt-tracy-wrapper
+    INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_compile_definitions(instrmt-tracy-wrapper INTERFACE "INSTRMT_CXX_WRAPPER=\"instrmt/tracy/tracy-wrapper.hxx\"" "TRACY_ENABLE")
+  target_link_libraries(instrmt-tracy-wrapper INTERFACE tracy)
+endif()
+
+# Install rules
+if(NOT CMAKE_SKIP_INSTALL_RULES)
+  include(cmake/install-rules.cmake)
+endif()
+
+# Tests
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(test)
+endif()
+
+# Benchmarks
+option(BUILD_BENCHMARKS "" ON)
 if (BUILD_BENCHMARKS)
-    add_subdirectory(benchmarks)
+  add_subdirectory(benchmarks)
 endif()

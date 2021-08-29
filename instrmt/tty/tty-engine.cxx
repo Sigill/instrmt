@@ -9,7 +9,7 @@
 #include <iostream>
 #include <unistd.h>
 
-#include <instrmt/tty/tty-utils.h>
+#include "tty-utils.h"
 
 using instrmt::ansi::style;
 
@@ -36,6 +36,7 @@ enum class OpenMode { write, append };
 std::ostream& operator<<(std::ostream& os, const OpenMode& mode) {
   return os << (mode == OpenMode::append ? "append" : "write");
 }
+
 class fopen_exception : public std::runtime_error {
 public:
   fopen_exception(const std::string& file, int errcode)

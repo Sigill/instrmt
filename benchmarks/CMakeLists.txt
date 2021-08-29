@@ -1,55 +1,33 @@
-find_package(benchmark)
+find_package(benchmark REQUIRED)
 
-
-add_executable(instrmt-benchmarks
+function(instrmt_benchmark name)
+  add_executable(${name}
     instrmt-benchmarks.cxx
     instrmt-benchmarks-functions.cxx
     instrmt-benchmarks-functions2.cxx)
 
-target_link_libraries(instrmt-benchmarks PRIVATE benchmark::benchmark benchmark::benchmark_main)
+  target_link_libraries(${name} PRIVATE benchmark::benchmark benchmark::benchmark_main)
+endfunction()
+
+instrmt_benchmark(instrmt-benchmarks)
 target_link_libraries(instrmt-benchmarks PRIVATE instrmt)
-target_include_directories(instrmt-benchmarks PRIVATE .)
 
-add_executable(instrmt-benchmarks-disable
-    instrmt-benchmarks.cxx
-    instrmt-benchmarks-functions.cxx
-    instrmt-benchmarks-functions2.cxx)
 
+instrmt_benchmark(instrmt-benchmarks-disable)
 target_compile_definitions(instrmt-benchmarks-disable PRIVATE INSTRMT_DISABLE)
-target_link_libraries(instrmt-benchmarks-disable PRIVATE benchmark::benchmark benchmark::benchmark_main)
 target_link_libraries(instrmt-benchmarks-disable PRIVATE instrmt)
-target_include_directories(instrmt-benchmarks-disable PRIVATE .)
 
-
-add_executable(instrmt-benchmarks-tty
-    instrmt-benchmarks.cxx
-    instrmt-benchmarks-functions.cxx
-    instrmt-benchmarks-functions2.cxx)
-
-target_link_libraries(instrmt-benchmarks-tty PRIVATE benchmark::benchmark benchmark::benchmark_main)
-use_tty_wrapper(instrmt-benchmarks-tty)
-target_include_directories(instrmt-benchmarks-tty PRIVATE .)
+instrmt_benchmark(instrmt-benchmarks-tty)
+target_link_libraries(instrmt-benchmarks-tty PRIVATE instrmt-tty-wrapper)
 
 
 if (INSTRMT_BUILD_ITT_ENGINE)
-    add_executable(instrmt-benchmarks-itt
-        instrmt-benchmarks.cxx
-        instrmt-benchmarks-functions.cxx
-        instrmt-benchmarks-functions2.cxx)
-
-    target_link_libraries(instrmt-benchmarks-itt PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    use_itt_wrapper(instrmt-benchmarks-itt)
-    target_include_directories(instrmt-benchmarks-itt PRIVATE .)
+  instrmt_benchmark(instrmt-benchmarks-itt)
+  target_link_libraries(instrmt-benchmarks-itt PRIVATE instrmt-itt-wrapper)
 endif()
 
 
 if (INSTRMT_BUILD_TRACY_ENGINE)
-    add_executable(instrmt-benchmarks-tracy
-        instrmt-benchmarks.cxx
-        instrmt-benchmarks-functions.cxx
-        instrmt-benchmarks-functions2.cxx)
-
-    target_link_libraries(instrmt-benchmarks-tracy PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    use_tracy_wrapper(instrmt-benchmarks-tracy)
-    target_include_directories(instrmt-benchmarks-tracy PRIVATE .)
+  instrmt_benchmark(instrmt-benchmarks-tracy)
+  target_link_libraries(instrmt-benchmarks-tracy PRIVATE instrmt-tracy-wrapper)
 endif()
