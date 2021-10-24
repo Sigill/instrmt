@@ -672,18 +672,18 @@ function start_ci_container(options) {
   const commands = [
     `${step_exe} git clone --depth 1 -b ${branch} /repo /src`,
     `${step_exe} mkdir -p /cache/node_modules /cache/vendor`,
-    `${step_exe} ln -snf /cache/node_modules /src/node_modules`,
-    `${step_exe} ln -snf /cache/vendor /src/vendor`
+    `${step_exe} ln -snf /cache/vendor /src/vendor`,
+    // npm does not allow node_modules to be a symlink, use rsync to synchronize it instead.
+    `${step_exe} rsync -a /cache/node_modules/ /src/node_modules/`,
+    `${step_exe} npm i --production --prefer-offline --no-audit --progress=false`,
+    `${step_exe} rsync -a /src/node_modules/ /cache/node_modules/`,
+    shellquote.quote([
+      'step', 'node', 'bootstrap.js', 'ci', // Not step -q otherwise there would be no output
+      ...dargs(options, {includes: ['quiet'], ignoreFalse: true}),
+      ...dargs(options, {includes: ['werror'], ignoreTrue: true}),
+      ...dargs(options, {includes: ['cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion']}),
+    ])
   ];
-
-  commands.push(`${step_exe} npm i --production --prefer-offline --no-audit --progress=false`);
-
-  commands.push(shellquote.quote([
-    'step', 'node', 'bootstrap.js', 'ci', // Not step -q otherwise there would be no output
-    ...dargs(options, {includes: ['quiet'], ignoreFalse: true}),
-    ...dargs(options, {includes: ['werror'], ignoreTrue: true}),
-    ...dargs(options, {includes: ['cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion']}),
-  ]));
 
   let command_string = commands.join(' && ');
 
