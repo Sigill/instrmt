@@ -7,7 +7,6 @@
     "global-agent": "^2.2.0",
     "got": "^11.8.2",
     "hasbin": "^1.2.3",
-    "listr2": "^3.9.0",
     "mkdirp": "^1.0.4",
     "param-case": "^3.0.4",
     "path-is-inside": "^1.0.2",
