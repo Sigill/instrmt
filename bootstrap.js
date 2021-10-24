@@ -8,6 +8,7 @@ const execa = require('execa');
 const fs = require('fs');
 const fse = require('fs-extra');
 const glob = require("glob");
+const Listr = require('listr');
 const https = require('follow-redirects').https;
 const mkdirp = require('mkdirp');
 const os = require('os');
@@ -19,12 +20,6 @@ const semver = require('semver');
 const shellquote = require('shell-quote');
 const tar = require('tar');
 const commander = require('commander');
-
-function shell(command, args, { quiet = false, cwd, env, stdio = ['ignore', 'inherit', 'inherit'] } = {}) {
-  const step_args = [command, ...args];
-  if (quiet) step_args.unshift('-q');
-  execa.sync(`${__dirname}/docker/step`, step_args, { stdio, cwd, env });
-}
 
 function as_array(arg) {
   if (Array.isArray(arg))
@@ -69,13 +64,6 @@ function resolve_directories(basename, workdir, { buildInSource = false, skipIns
   }
 }
 
-async function extract_tar_gz(archive, dest = '.', strip_components = 0) {
-  console.log(chalk.blue(`Extracting ${archive} to ${dest}`));
-  return mkdirp(dest).then(() => {
-    return tar.x({ file: archive, strip: strip_components, C: dest });
-  });
-}
-
 async function md5sum(file) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('md5');
@@ -86,23 +74,7 @@ async function md5sum(file) {
   });
 }
 
-async function verify_md5(filename, expected_checksum) {
-  console.log(chalk.blue(`Verifying checksum of ${filename}`));
-  return md5sum(filename).then(actual_checksum => {
-    if (actual_checksum !== expected_checksum)
-      throw new Error(`md5(${filename}) = ${actual_checksum} != ${expected_checksum}`);
-    console.log(chalk.green('Checksum ok'));
-  });
-}
-
 async function download(url, dest) {
-  console.log(chalk.blue(`Downloading ${url}`));
-
-  if (fs.existsSync(dest)) {
-    console.log(chalk.blue(`${dest} already exists, skipping download`));
-    return Promise.resolve(dest);
-  }
-
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
 
@@ -135,22 +107,6 @@ async function download(url, dest) {
   });
 }
 
-async function unpack_archive({url, file, checksum, download_dir, strip_components=0, dest} = {}) {
-  assert(url || file, 'url or file must be specified');
-
-  file ||= path.join(download_dir || os.tmpdir(), path.basename(new URL(url).pathname));
-
-  if (url) {
-    mkdirp.sync(path.dirname(file));
-    await download(url, file);
-  }
-
-  if (checksum)
-    await verify_md5(file, checksum);
-
-  await extract_tar_gz(file, dest, strip_components);
-}
-
 function nproc() { return os.cpus().length; }
 
 function cmake_configure_command(src, bld, {cmake='cmake', buildType, installPrefix, args = []} = {}) {
@@ -163,24 +119,13 @@ function cmake_configure_command(src, bld, {cmake='cmake', buildType, installPre
   return cmd;
 }
 
-function cmake_configure(src, bld, {cmake='cmake', buildType, installPrefix, args = []} = {}) {
-  const cmd = cmake_configure_command(src, bld, {cmake, buildType, installPrefix, args});
-  shell(cmd[0], cmd.slice(1));
-}
-
-function cmake_build(bld, {cmake, target} = {}) {
+function cmake_build_command(bld, {cmake, target} = {}) {
   cmake ||= 'cmake';
   var cmd = ['--build', bld];
   if (target !== undefined)
     cmd.push('--target', target);
   cmd.push('-j', `${nproc()}`);
-  shell(cmake, cmd);
-}
-
-function cmake_basic_recipe(srcdir, builddir, {buildType = 'Release', installPrefix, args = []} = {}) {
-  mkdirp.sync(builddir);
-  cmake_configure(srcdir, builddir, {buildType, installPrefix, args});
-  cmake_build(builddir, {target: installPrefix ? 'install' : undefined});
+  return [cmake, ...cmd];
 }
 
 function install(files, dir, {filename, base} = {}) {
@@ -227,203 +172,278 @@ function isDirectory(p) {
   return fs.existsSync(p) && fs.lstatSync(p).isDirectory();
 }
 
-async function fetch_cmake28({directory = requiredArg('directory')} = {}) {
-  const dirs = resolve_directories('cmake-2.8.12', directory);
+function listr_execa_promise(task, command, {quiet=false, env, cwd, stdio} = {}) {
+  assert(Array.isArray(command) && command.length > 1, 'Command is not a valid array');
 
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: 'https://github.com/Kitware/CMake/archive/v2.8.12.tar.gz',
-                        file: path.join(directory, 'cmake-2.8.12.tar.gz'),
-                        checksum: '0dc2118e56f5c02dc5a90be9bd19befc',
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'cmake2812-noqt.diff')]);
-  mkdirp.sync(dirs.build);
-  shell(path.join(dirs.src, 'bootstrap'), [`--parallel=${nproc()}`, '--no-qt-gui', `--prefix=${dirs.install}`], {cwd: dirs.build});
-  shell('make', ['-C', dirs.build, `-j${nproc()}`, 'install']);
-
-  dirs.temp.forEach(e => rimraf.sync(e));
-}
-
-async function fetch_cmake3({directory = requiredArg('directory'), version = requiredArg('version'), checksum} = {}) {
-  const dirs = {install: path.join(directory, `cmake-${version}`)};
-
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/Kitware/CMake/releases/download/v${version}/cmake-${version}-Linux-x86_64.tar.gz`,
-                        file: path.join(directory, `cmake-${version}-Linux-x86_64.tar.gz`),
-                        checksum,
-                        dest: dirs.install,
-                        strip_components: 1});
-}
-
-async function fetch_ittapi({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType} = {}) {
-  const dirs = resolve_directories(dependency('ittapi', version).basename(suffix), directory);
-
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/intel/ittapi/archive/${version}.tar.gz`,
-                        file: path.join(directory, `ittapi-${version}.tar.gz`),
-                        checksum,
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType});
-
-  install(glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)')),
-          path.join(dirs.install, 'include'),
-          {base: path.join(dirs.src, 'include')});
-  install(path.join(dirs.build, 'bin', 'libittnotify.a'), path.join(dirs.install, 'lib64'));
-
-  dirs.temp.forEach(e => rimraf.sync(e));
-}
-
-async function fetch_capstone({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType} = {}) {
-  const dirs = resolve_directories(dependency('capstone', version).basename(suffix), directory);
-
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/aquynh/capstone/archive/${version}.tar.gz`,
-                        file: path.join(directory, `capstone-${version}.tar.gz`),
-                        checksum,
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')]);
-
-  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install});
-
-  // Drop the dynamic libraries in order to force the use of the static ones when building tracy-profiler.
-  glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f));
-
-  dirs.temp.forEach(e => rimraf.sync(e));
-}
-
-async function fetch_glfw({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType} = {}) {
-  const dirs = resolve_directories(dependency('glfw', version).basename(suffix), directory);
-
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/glfw/glfw/archive/${version}.tar.gz`,
-                        file: path.join(directory, `glfw-${version}.tar.gz`),
-                        checksum,
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  cmake_basic_recipe(dirs.src, dirs.build,
-                     {buildType: cmakeBuildType,
-                      installPrefix: dirs.install,
-                      args: ['-DGLFW_BUILD_DOCS=OFF', '-DGLFW_BUILD_EXAMPLES=OFF', '-DGLFW_BUILD_TESTS=OFF']});
-
-  sed(path.join(dirs.install, 'lib/pkgconfig/glfw3.pc'), 'Requires.private:  x11', 'Requires:  x11');
-
-
-  dirs.temp.forEach(e => rimraf.sync(e));
-}
-
-async function fetch_tracy({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, components, withGlfw, withCapstone} = {}) {
-  const dirs = resolve_directories(dependency('tracy', version).basename(suffix), directory, {buildInSource: true});
-
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/wolfpld/tracy/archive/${version}.tar.gz`,
-                        file: path.join(directory, `glfw-${version}.tar.gz`),
-                        checksum,
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  if (semver.ltr(version, '0.7.2')) {
-    shell('patch', ['-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'tracy-pkgconfig-static.diff')]);
-  }
-
-  if (version === 'master' || semver.gte(version, '0.7.6')) {
-    ['TracyWorker.cpp', 'TracySourceView.cpp'].forEach(f => {
-      sed(path.join(dirs.src, 'server', f), 'capstone.h', 'capstone/capstone.h');
+  return execa(`${__dirname}/docker/mergestd.sh`, ['unbuffer', ...command], {env, cwd, stdio})
+    .then(result => {
+      if (!quiet && result.stdout) task.output = result.stdout;
+    })
+    .catch(err => {
+      if (err.stdout) task.output = err.stdout;
+      throw new Listr.ListrError(`Command failed with exit code ${err.exitCode}`);
     });
-  }
+}
 
-  const build = (directory, {extra_pc_dirs = []} = {}) => {
+function listr_execa_task(command, {quiet=false, title, skip, enabled, env, cwd, stdio, pre, post} = {}) {
+  return {
+    title: title || shellquote.quote(command),
+    skip,
+    enabled,
+    task: (ctx, task) => {
+      const f = () => listr_execa_promise(task, command, {quiet, env, cwd, stdio});
+
+      let chain = pre
+        ? new Promise( resolve => resolve(pre(ctx, task)) ).then(f)
+        : f();
+      if (post)
+        chain = chain.then(() => post(ctx, task));
+      return chain;
+    }
+  };
+}
+
+function listr_download_task(url, file, {quiet} = {}) {
+  return {
+    title: `Download ${url}`,
+    skip: () => fs.existsSync(file) && (quiet || `${file} already exists`),
+    task: () => mkdirp(path.dirname(file)).then(() => download(url, file))
+  };
+}
+
+function listr_checksum_task(file, expected_checksum, {quiet} = {}) {
+  return {
+    title: `Verify checksum of ${file}`,
+    skip: () => !expected_checksum && (quiet || 'Checksum not specified'),
+    task: () => md5sum(file).then(actual_checksum => {
+      if (actual_checksum !== expected_checksum)
+        throw new Listr.ListrError(`md5(${file}) = ${actual_checksum} != ${expected_checksum}`);
+    })
+  };
+}
+
+function listr_extract_task(archive, dest, {strip_components} = {}) {
+  return {
+    title: `Extract ${archive}`,
+    task: () => mkdirp(dest).then(() => tar.x({ file: archive, strip: strip_components, C: dest }))
+  };
+}
+
+function* listr_download_and_extract_tasks(url, archive, checksum, dest, quiet, {strip_components} = {}) {
+  yield listr_download_task(url, archive, quiet);
+  yield listr_checksum_task(archive, checksum, quiet);
+  yield listr_extract_task(archive, dest, {strip_components});
+}
+
+function listr_cleanup_task(files) {
+  return {
+    title: 'Cleanup',
+    task: () => files.forEach(e => rimraf.sync(e))
+  };
+}
+
+function fetch_cmake28_task({directory = requiredArg('directory'), quiet} = {}) {
+  const dirs = resolve_directories('cmake-2.8.12', directory);
+  const url = 'https://github.com/Kitware/CMake/archive/v2.8.12.tar.gz';
+  const archive = path.join(directory, 'cmake-2.8.12.tar.gz');
+
+  return {
+    title: 'Fetch CMake 2.8.12',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, '0dc2118e56f5c02dc5a90be9bd19befc', dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'cmake2812-noqt.diff')], {quiet}),
+      listr_execa_task([path.join(dirs.src, 'bootstrap'), `--parallel=${nproc()}`, '--no-qt-gui', `--prefix=${dirs.install}`],
+                       {cwd: dirs.build, pre: () => mkdirp(dirs.build), quiet}),
+      listr_execa_task(['make', '-C', dirs.build, `-j${nproc()}`, 'install'], {quiet}),
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
+}
+
+function fetch_cmake3_task({directory = requiredArg('directory'), version = requiredArg('version'), checksum, quiet} = {}) {
+  const dirs = {install: path.join(directory, `cmake-${version}`)};
+  const url = `https://github.com/Kitware/CMake/releases/download/v${version}/cmake-${version}-Linux-x86_64.tar.gz`;
+  const archive = path.join(directory, `cmake-${version}-Linux-x86_64.tar.gz`);
+
+  return {
+    title: 'Fetch CMake 3',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.install, quiet, {strip_components: 1})
+    ])
+  };
+}
+
+function fetch_ittapi_task({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType, quiet} = {}) {
+  const dirs = resolve_directories(dependency('ittapi', version).basename(suffix), directory);
+  const url = `https://github.com/intel/ittapi/archive/${version}.tar.gz`;
+  const archive = path.join(directory, `ittapi-${version}.tar.gz`);
+
+  return {
+    title: 'Fetch ittapi',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, args: []}),
+                       {pre: () => mkdirp(dirs.build), quiet}),
+      listr_execa_task(cmake_build_command(dirs.build), {quiet}),
+      {
+        title: 'Install',
+        task: () => {
+          install(glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)')),
+                  path.join(dirs.install, 'include'),
+                  {base: path.join(dirs.src, 'include')});
+          install(path.join(dirs.build, 'bin', 'libittnotify.a'), path.join(dirs.install, 'lib64'));
+        }
+      },
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
+}
+
+function fetch_capstone_task({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType, quiet} = {}) {
+  const dirs = resolve_directories(dependency('capstone', version).basename(suffix), directory);
+  const url = `https://github.com/aquynh/capstone/archive/${version}.tar.gz`;
+  const archive = path.join(directory, `capstone-${version}.tar.gz`);
+
+  return {
+    title: 'Fetch capstone',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')], {quiet}),
+      listr_execa_task(cmake_configure_command(dirs.src, dirs.build, {cmakeBuildType, installPrefix: dirs.install, args: []}),
+                       {pre: () => mkdirp(dirs.build), quiet}),
+      listr_execa_task(cmake_build_command(dirs.build, {target: 'install'}), {quiet}),
+      {
+        title: 'Discard dynamic libraries',
+        task: () => glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f))
+      },
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
+}
+
+function fetch_glfw_task({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType, quiet} = {}) {
+  const dirs = resolve_directories(dependency('glfw', version).basename(suffix), directory);
+  const url = `https://github.com/glfw/glfw/archive/${version}.tar.gz`;
+  const archive = path.join(directory, `glfw-${version}.tar.gz`);
+
+  return {
+    title: 'Fetch glfw',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(cmake_configure_command(dirs.src, dirs.build,
+                                               {
+                                                 cmakeBuildType, installPrefix: dirs.install,
+                                                 args: ['-DGLFW_BUILD_DOCS=OFF', '-DGLFW_BUILD_EXAMPLES=OFF', '-DGLFW_BUILD_TESTS=OFF']
+                                               }),
+                       {pre: () => mkdirp(dirs.build), quiet}),
+      listr_execa_task(cmake_build_command(dirs.build, {target: 'install'}), {quiet}),
+      {
+        title: 'Fix pkgconfig file',
+        task: () => sed(path.join(dirs.install, 'lib/pkgconfig/glfw3.pc'), 'Requires.private:  x11', 'Requires:  x11')
+      },
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
+}
+
+function fetch_tracy_task({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, components, withGlfw, withCapstone, quiet} = {}) {
+  const dirs = resolve_directories(dependency('tracy', version).basename(suffix), directory, {buildInSource: true});
+  const url = `https://github.com/wolfpld/tracy/archive/${version}.tar.gz`;
+  const archive = path.join(directory, `tracy-${version}.tar.gz`);
+
+  const buildTask = (directory, {extra_pc_dirs = [], skip, enabled} = {}) => {
     const PKG_CONFIG_PATH = extra_pc_dirs.concat((process.env.PKG_CONFIG_PATH || '').split(path.delimiter).filter(e => e)).join(path.delimiter);
     const env = Object.assign({}, process.env, {PKG_CONFIG_PATH});
-    shell('make', ['-C', directory, '-j', `${nproc()}`, 'release'], {env});
+    return listr_execa_task(['make', '-C', directory, '-j', `${nproc()}`, 'release'], {env, skip, enabled});
   };
 
-  if (components.includes('lib')) {
-    build(path.join(dirs.src, 'library', 'unix'));
-    install(path.join(dirs.src, 'library', 'unix', 'libtracy-release.so'), path.join(dirs.install, 'lib'), {filename: 'libtracy.so'});
+  return {
+    title: 'Fetch tracy',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'tracy-pkgconfig-static.diff')],
+                       {quiet, enabled: () => semver.ltr(version, '0.7.2')}),
+      {
+        title: `Fix includes`,
+        enabled: () => version === 'master' || semver.gte(version, '0.7.6'),
+        task: () => {
+          ['TracyWorker.cpp', 'TracySourceView.cpp'].forEach(f => {
+            sed(path.join(dirs.src, 'server', f), 'capstone.h', 'capstone/capstone.h');
+          });
+        }
+      },
+      buildTask(path.join(dirs.src, 'library', 'unix'), {enabled: () => components.includes('lib')}),
+      {
+        title: 'Install library',
+        enabled: () => components.includes('lib'),
+        task: () => {
+          install(path.join(dirs.src, 'library', 'unix', 'libtracy-release.so'), path.join(dirs.install, 'lib'), {filename: 'libtracy.so'});
 
-    const installHeaders = (...subdirs) => {
-      const files = glob.sync(path.join(dirs.src, ...subdirs, '*.h?(pp)'));
-      install(files, path.join(dirs.install, 'include', ...subdirs));
-    };
+          const installHeaders = (...subdirs) => {
+            const files = glob.sync(path.join(dirs.src, ...subdirs, '*.h?(pp)'));
+            install(files, path.join(dirs.install, 'include', ...subdirs));
+          };
 
-    installHeaders();
-    installHeaders('client');
-    installHeaders('common');
-
-    // const files = glob.sync(path.join(dirs.src, '**', '*.h?(pp)')).filter(f => {
-    //   return [dirs.src, path.join(dirs.src, 'client'), path.join(dirs.src, 'common')].includes(path.dirname(f));
-    // });
-    // install(files, path.join(dirs.install, 'include'), {base: dirs.src});
-
-    // const files = glob.sync(path.join(dirs.src, '**', '*.h?(pp)'),
-    //                         {ignore: [dirs.src, path.join(dirs.src, 'client'), path.join(dirs.src, 'common')].map(p => `${p}/*`)});
-    // install(files, path.join(dirs.install, 'include'), {base: dirs.src});
-  }
-
-  if (components.includes('capture')) {
-    const builddir = path.join(dirs.src, 'capture', 'build', 'unix');
-    const extra_pc_dirs = [withCapstone].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'));
-    build(builddir, {extra_pc_dirs});
-    install(path.join(builddir, 'capture-release'), path.join(dirs.install, 'bin'), {filename: 'capture'});
-  }
-
-  if (components.includes('profiler')) {
-    const builddir = path.join(dirs.src, 'profiler', 'build', 'unix');
-    const extra_pc_dirs = [withCapstone, withGlfw].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'));
-    build(builddir, {extra_pc_dirs});
-    install(path.join(builddir, 'Tracy-release'), path.join(dirs.install, 'bin'), {filename: 'tracy'});
-  }
-
-  dirs.temp.forEach(e => rimraf.sync(e));
+          installHeaders();
+          installHeaders('client');
+          installHeaders('common');
+        }
+      },
+      buildTask(path.join(dirs.src, 'capture', 'build', 'unix'),
+                {
+                  extra_pc_dirs: [withCapstone].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig')),
+                  enabled: () => components.includes('capture')
+                }),
+      {
+        title: 'Install capture',
+        enabled: () => components.includes('capture'),
+        task: () => {
+          install(path.join(path.join(dirs.src, 'capture', 'build', 'unix'), 'capture-release'), path.join(dirs.install, 'bin'), {filename: 'capture'});
+        }
+      },
+      buildTask(path.join(dirs.src, 'profiler', 'build', 'unix'),
+                {
+                  extra_pc_dirs: [withCapstone, withGlfw].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig')),
+                  enabled: () => components.includes('profiler')
+                }),
+      {
+        title: 'Install profiler',
+        enabled: () => components.includes('profiler'),
+        task: () => {
+          install(path.join(path.join(dirs.src, 'profiler', 'build', 'unix'), 'Tracy-release'), path.join(dirs.install, 'bin'), {filename: 'tracy'});
+        }
+      },
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
 }
 
-async function fetch_google_benchmark({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType} = {}) {
+function fetch_google_benchmark_task({directory = requiredArg('directory'), version = requiredArg('version'), suffix, checksum, cmakeBuildType, quiet} = {}) {
   const dirs = resolve_directories(dependency('google-benchmark', version).basename(suffix), directory);
+  const url = `https://github.com/google/benchmark/archive/${version}.tar.gz`;
+  const archive = path.join(directory, `google-benchmark-${version}.tar.gz`);
 
-  if (isDirectory(dirs.install)) {
-    console.log(chalk.green(`${dirs.install} already exists, skipping`));
-    return;
-  }
-
-  await unpack_archive({url: `https://github.com/google/benchmark/archive/${version}.tar.gz`,
-                        file: path.join(directory, `google-benchmark-${version}.tar.gz`),
-                        checksum,
-                        dest: dirs.src,
-                        strip_components: 1});
-
-  cmake_basic_recipe(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DBENCHMARK_ENABLE_TESTING=OFF']});
-
-  dirs.temp.forEach(e => rimraf.sync(e));
+  return {
+    title: 'Fetch google-benchmark',
+    skip: () => isDirectory(dirs.install) && (quiet || `${dirs.install} already exists`),
+    task: () => new Listr([
+      ...listr_download_and_extract_tasks(url, archive, checksum, dirs.src, quiet, {strip_components: 1}),
+      listr_execa_task(cmake_configure_command(dirs.src, dirs.build,
+                                               {
+                                                 cmakeBuildType, installPrefix: dirs.install,
+                                                 args: ['-DBENCHMARK_ENABLE_TESTING=OFF']
+                                               }),
+                       {pre: () => mkdirp(dirs.build), quiet}),
+      listr_execa_task(cmake_build_command(dirs.build, {target: 'install'}), {quiet}),
+      listr_cleanup_task(dirs.temp)
+    ])
+  };
 }
 
 function absolute_path(p) { return path.resolve(p); }
@@ -527,33 +547,38 @@ class FetchCommand {
 }
 
 new FetchCommand('cmake28', 'CMake 2.8.12')
-  .action(fetch_cmake28);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_cmake28_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('cmake3', 'CMake 3.x')
   .versionOption()
   .checksumOption()
-  .action(fetch_cmake3);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_cmake3_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('ittapi', 'ITT API')
   .versionOption()
   .suffixOption()
   .checksumOption()
   .cmakeBuildtypeOption()
-  .action(fetch_ittapi);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_ittapi_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('capstone', 'Capstone')
   .versionOption()
   .suffixOption()
   .checksumOption()
   .cmakeBuildtypeOption()
-  .action(fetch_capstone);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_capstone_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('glfw', 'GLFW')
   .versionOption()
   .suffixOption()
   .checksumOption()
   .cmakeBuildtypeOption()
-  .action(fetch_glfw);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_glfw_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('tracy', 'Tracy')
   .versionOption()
@@ -564,14 +589,16 @@ new FetchCommand('tracy', 'Tracy')
   .optionsPostProcessor((options) => { options.withGlfw ??= dependency('glfw').path(options.directory); })
   .option('--with-capstone <directory>', 'Root directory of capstone (location of lib/pkgconfig/capstone.pc).')
   .optionsPostProcessor((options) => { options.withCapstone ??= dependency('capstone').path(options.directory); })
-  .action(fetch_tracy);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_tracy_task(options)], {renderer: 'verbose'}).run());
 
 new FetchCommand('google-benchmark')
   .versionOption()
   .suffixOption()
   .checksumOption()
   .cmakeBuildtypeOption()
-  .action(fetch_google_benchmark);
+  .option('-q, --quiet', '')
+  .action((options) => new Listr([fetch_google_benchmark_task(options)], {renderer: 'verbose'}).run());
 
 program
   .command('fetch-dependencies')
@@ -579,26 +606,36 @@ program
   .option('-C, --directory <directory>', 'Change to DIR before performing any operations.', absolute_path,
           __dirname === process.cwd() ? path.join(process.cwd(), 'vendor') : process.cwd())
   .action(async (options) => {
-    await fetch_ittapi({directory: options.directory,
-                        version: dependency('ittapi').default_version(),
-                        checksum: dependency('ittapi').checksum()});
-
-    await fetch_tracy({directory: options.directory,
-                       version: dependency('tracy').default_version(),
-                       checksum: dependency('tracy').checksum(),
-                       components: ['lib']});
-
-    await fetch_google_benchmark({directory: options.directory,
-                                  version: dependency('google-benchmark').default_version(),
-                                  checksum: dependency('google-benchmark').checksum()});
+    return new Listr([
+      fetch_ittapi_task({
+        directory: options.directory,
+        version: dependency('ittapi').default_version(),
+        checksum: dependency('ittapi').checksum()
+      }),
+      fetch_tracy_task({
+        directory: options.directory,
+        version: dependency('tracy').default_version(),
+        checksum: dependency('tracy').checksum(),
+        components: ['lib']
+      }),
+      fetch_google_benchmark_task({
+        directory: options.directory,
+        version: dependency('google-benchmark').default_version(),
+        checksum: dependency('google-benchmark').checksum()
+      })
+    ], {renderer: 'verbose'}).run();
   });
 
 function build_examples(instrmt_dir, build_dir, cmake_bin, ittapi_root, tracy_root) {
-  cmake_configure(path.join(__dirname, 'example'), build_dir,
-                  {buildType: 'Release',
-                   cmake: cmake_bin,
-                   args: [`-DInstrmt_DIR=${instrmt_dir}`, `-DVTUNE_ROOT=${ittapi_root}`, `-DTRACY_ROOT=${tracy_root}`]});
-  cmake_build(build_dir, {cmake: cmake_bin});
+  return [
+    cmake_configure_command(path.join(__dirname, 'example'), build_dir,
+                            {
+                              buildType: 'Release',
+                              cmake: cmake_bin,
+                              args: [`-DInstrmt_DIR=${instrmt_dir}`, `-DVTUNE_ROOT=${ittapi_root}`, `-DTRACY_ROOT=${tracy_root}`]
+                            }),
+    cmake_build_command(build_dir, {cmake: cmake_bin})
+  ]
 }
 
 function instrmt_configure_command(srcdir, builddir, {buildType, ittapi, tracy, googleBenchmark, vendorDir, args = []} = {}) {
@@ -635,27 +672,26 @@ program
   .option('--with-tracy [directory]', absolute_path)
   .option('--with-benchmarks [directory]', absolute_path)
   .option('--build [target]')
+  .option('-q, --quiet', '')
   .action((options, command) => {
-    let [cmd, ...args] = instrmt_configure_command(__dirname,
-                                                   options.directory,
-                                                   {
-                                                     buildType: options.cmakeBuildType,
-                                                     ittapi: options.withIttapi,
-                                                     tracy: options.withTracy,
-                                                     googleBenchmark: options.withBenchmarks,
-                                                     vendorDir: path.join(__dirname, 'vendor'),
-                                                     args: command.args
-                                                   });
+    const configure = instrmt_configure_command(__dirname,
+                                                options.directory,
+                                                {
+                                                  buildType: options.cmakeBuildType,
+                                                  ittapi: options.withIttapi,
+                                                  tracy: options.withTracy,
+                                                  googleBenchmark: options.withBenchmarks,
+                                                  vendorDir: path.join(__dirname, 'vendor'),
+                                                  args: command.args
+                                                });
 
-    shell(cmd, args);
+    const build = cmake_build_command(options.directory,
+                                      {target: (options.build && options.build === true) ? undefined : options.build});
 
-    if (options.build) {
-      if (options.build === true) {
-        cmake_build(options.directory);
-      } else {
-        cmake_build(options.directory, {target: options.build});
-      }
-    }
+    return new Listr([
+      listr_execa_task(configure, {quiet: options.quiet}),
+      listr_execa_task(build, {quiet: options.quiet, enabled: () => !!options.build})
+    ], {renderer: 'verbose'}).run();
   });
 
 program
@@ -664,33 +700,67 @@ program
   .option('--ittapi-root <directory>', '', absolute_path, dependency('ittapi').path(path.join(__dirname, 'vendor')))
   .option('--tracy-root <directory>', '', absolute_path, dependency('tracy').path(path.join(__dirname, 'vendor')))
   .option('--cmake <file>', '', absolute_path, 'cmake')
+  .option('-q, --quiet', '')
   .action((options) => {
-    shell(options.cmake, ['--version']);
-
-    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'instrmt-it-'));
-    const instrmt_bld = path.join(temp, 'instrmt-build');
-    const instrmt_dist = path.join(temp, 'instrmt-install');
-
-    cmake_configure(__dirname, instrmt_bld,
-                    {cmake: options.cmake,
-                     buildType: 'Release',
-                     installPrefix: instrmt_dist,
-                     args: [
-                       '-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${options.ittapiRoot}`,
-                       '-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${options.tracyRoot}`,
-                       '-DBUILD_BENCHMARKS=OFF', '-DBUILD_TESTING=OFF'
-                     ]});
-
-    cmake_build(instrmt_bld, {cmake: options.cmake, target: 'install'});
-
-    build_examples(instrmt_bld,
-                   path.join(temp, 'example-from-build'),
-                   options.cmake, options.ittapiRoot, options.tracyRoot);
-    build_examples(path.join(instrmt_dist, 'share', 'cmake', 'instrmt'),
-                   path.join(temp, 'example-from-install'),
-                   options.cmake, options.ittapiRoot, options.tracyRoot);
-
-    rimraf.sync(temp);
+    return new Listr([
+      {
+        title: 'Create temporary directory',
+        task: (ctx, task) => {
+          ctx.temp = fs.mkdtempSync(path.join(os.tmpdir(), 'instrmt-it-'));
+          task.output = ctx.temp;
+          ctx.instrmt_bld = path.join(ctx.temp, 'instrmt-build');
+          ctx.instrmt_dist = path.join(ctx.temp, 'instrmt-install');
+        }
+      },
+      {
+        title: 'Configure instrmt',
+        task: (ctx, task) => {
+          const configure_command = cmake_configure_command(__dirname, ctx.instrmt_bld,
+                                                            {
+                                                              cmake: options.cmake,
+                                                              buildType: 'Release',
+                                                              installPrefix: ctx.instrmt_dist,
+                                                              args: [
+                                                                '-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${options.ittapiRoot}`,
+                                                                '-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${options.tracyRoot}`,
+                                                                '-DBUILD_BENCHMARKS=OFF', '-DBUILD_TESTING=OFF'
+                                                              ]
+                                                            });
+          task.title = shellquote.quote(configure_command);
+          return listr_execa_promise(task, configure_command, {quiet: options.quiet});
+        }
+      },
+      {
+        title: 'Build instrmt',
+        task: (ctx, task) => {
+          const build_command = cmake_build_command(ctx.instrmt_bld, {cmake: options.cmake, target: 'install'});
+          task.title = shellquote.quote(build_command);
+          return listr_execa_promise(task, build_command, {quiet: options.quiet});
+        }
+      },
+      {
+        title: 'Build examples using instrmt build tree',
+        task: (ctx) => {
+          const commands = build_examples(ctx.instrmt_bld,
+                                          path.join(ctx.temp, 'example-from-build'),
+                                          options.cmake, options.ittapiRoot, options.tracyRoot);
+          return new Listr(commands.map(c => listr_execa_task(c, {quiet: options.quiet})));
+        }
+      },
+      {
+        title: 'Build examples using instrmt install tree',
+        task: (ctx) => {
+          const commands = build_examples(path.join(ctx.instrmt_dist, 'share', 'cmake', 'instrmt'),
+                                          path.join(ctx.temp, 'example-from-install'),
+                                          options.cmake, options.ittapiRoot, options.tracyRoot);
+          return new Listr(commands.map(c => listr_execa_task(c, {quiet: options.quiet})));
+        }
+      },
+      {
+        title: 'Cleanup',
+        task: (ctx) => { rimraf.sync(ctx.temp) }
+      }
+    ], {renderer: 'verbose'}).run();
   });
 
 function docker_volumes() {
@@ -715,7 +785,7 @@ program
         execa.sync('docker', ['docker', 'volume', 'create', 'instrmt-build-cache']);
       }
 
-      const commands = [
+      let commands = [
         `git clone --depth 1 -b ${branch} /repo /src`,
         `ln -snf /cache/node_modules /src/node_modules`,
         `ln -snf /cache/vendor /src/vendor`
@@ -731,25 +801,48 @@ program
         if (options.test) yield '--test'; else yield '--no-test';
         if (quiet) yield '-q';
       };
-      commands.push(shellquote.quote(['node', 'bootstrap.js', 'ci', ...ci_opts()]));
 
       const step = quiet ? 'step -q' : 'step';
-      let script = commands.map(e => `${step} ${e}`).join(' && ');
+      commands = commands.map(e => `${step} ${e}`);
 
+      commands.push(shellquote.quote(['node', 'bootstrap.js', 'ci', ...ci_opts()]));
+
+      let script = commands.join(' && ');
       if (options.shell) {
         script = `${script} ; bash`;
       }
 
-      shell('docker',
-            [ 'run', '--rm', (options.shell ? '-it' : '-t'), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
-              'instrmt-build',
-              'bash', '-c', script ],
-            {stdio: 'inherit'});
+      const docker_command = [
+        'docker', 'run', '--rm', (options.shell ? '-it' : '-t'), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
+        'instrmt-build',
+        'bash', '-c', script
+      ];
+      return new Listr([
+        {
+          title: shellquote.quote(docker_command),
+          task: () => execa(docker_command[0], docker_command.slice(1), {stdio: 'inherit'})
+            .catch(err => { throw new Listr.ListrError(`Command failed with exit code ${err.exitCode}`); })
+        }
+      ], {renderer: 'verbose'}).run();
     } else {
+      const tasks = [];
+
       if (!options.fast) {
-        shell('node', ['bootstrap.js', 'fetch-ittapi'], {quiet});
-        shell('node', ['bootstrap.js', 'fetch-tracy'], {quiet});
-        shell('node', ['bootstrap.js', 'fetch-google-benchmark'], {quiet});
+        tasks.push(fetch_ittapi_task({directory: path.join(__dirname, 'vendor'),
+                                      version: dependency('ittapi').default_version(),
+                                      checksum: dependency('ittapi').checksum(),
+                                      quiet}));
+
+        tasks.push(fetch_tracy_task({directory: path.join(__dirname, 'vendor'),
+                                     version: dependency('tracy').default_version(),
+                                     checksum: dependency('tracy').checksum(),
+                                     components: ['lib'],
+                                     quiet}));
+
+        tasks.push(fetch_google_benchmark_task({directory: path.join(__dirname, 'vendor'),
+                                                version: dependency('google-benchmark').default_version(),
+                                                checksum: dependency('google-benchmark').checksum(),
+                                                quiet}));
       }
 
       const ittapi_dir = dependency('ittapi').path();
@@ -766,13 +859,15 @@ program
                                                     args: options.warningAsError ? ['-DCMAKE_CXX_FLAGS=-Werror'] : []
                                                   });
 
-      shell(configure[0], configure.slice(1), {quiet});
-      shell('cmake', ['--build', path.join(__dirname, 'build'), '-j', `${nproc()}`], {quiet});
+      tasks.push(listr_execa_task(configure, {quiet}));
+      tasks.push(listr_execa_task(['cmake', '--build', path.join(__dirname, 'build'), '-j', `${nproc()}`], {quiet}));
 
       if (options.test) {
-        shell('env', ['-C', 'build', 'ctest'], {quiet});
-        shell('node', ['bootstrap.js', 'integration-tests', '--ittapi-root', ittapi_dir, '--tracy-root', tracy_dir], {quiet});
+        tasks.push(listr_execa_task(['env', '-C', 'build', 'ctest'], {quiet}));
+        tasks.push(listr_execa_task(['node', 'bootstrap.js', 'integration-tests', '--ittapi-root', ittapi_dir, '--tracy-root', tracy_dir], {quiet}));
       }
+
+      return new Listr(tasks, {renderer: 'verbose'}).run();
     }
 
   });

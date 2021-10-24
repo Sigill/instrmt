@@ -13,6 +13,6 @@ ENV PATH="/usr/lib/ccache:${PATH}"
 
 ENV CCACHE_DIR=/cache/ccache
 
-RUN mkdir -p /src /cache/ccache /cache/node_modules /cache/vendor
+RUN mkdir -p /src
 
 WORKDIR /src
