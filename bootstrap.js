@@ -31,6 +31,9 @@ import commander from 'commander';
 // https://techsparx.com/nodejs/esnext/dirname-es-modules.html
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
+
+const nproc = os.cpus().length;
+
 function as_array(arg) {
   if (Array.isArray(arg))
     return arg;
@@ -81,8 +84,6 @@ function resolve_directories(basename, workdir, { buildInSource = false, skipIns
   }
 }
 
-function nproc() { return os.cpus().length; }
-
 function cmake_configure_command(src, bld, {cmake='cmake', buildType, installPrefix, args = []} = {}) {
   var cmd = [cmake, '-S', src, '-B', bld];
   if (buildType)
@@ -97,7 +98,7 @@ function cmake_build_command(bld, {cmake='cmake', target} = {}) {
   var cmd = [cmake, '--build', bld];
   if (target !== undefined)
     cmd.push('--target', target);
-  cmd.push('-j', `${nproc()}`);
+  cmd.push('-j', `${nproc}`);
   return cmd;
 }
 
@@ -332,10 +333,10 @@ function steps({quiet} = {}) {
           await this.execa(['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'cmake2812-noqt.diff')]);
           mkdirp.sync(dirs.build);
           await this.execa(
-            [path.join(dirs.src, 'bootstrap'), `--parallel=${nproc()}`, '--no-qt-gui', `--prefix=${dirs.install}`],
+            [path.join(dirs.src, 'bootstrap'), `--parallel=${nproc}`, '--no-qt-gui', `--prefix=${dirs.install}`],
             {cwd: dirs.build}
           );
-          await this.execa(['make', '-C', dirs.build, `-j${nproc()}`, 'install']);
+          await this.execa(['make', '-C', dirs.build, `-j${nproc}`, 'install']);
           this.cleanup(dirs.temp);
         }
       });
@@ -442,7 +443,7 @@ function steps({quiet} = {}) {
         const env = extra_pc_dirs.length === 0
           ? undefined
           : {PKG_CONFIG_PATH: extra_pc_dirs.concat((process.env.PKG_CONFIG_PATH || '').split(path.delimiter).filter(e => e)).join(path.delimiter)};
-        return this.execa(['make', '-C', directory, '-j', `${nproc()}`, 'release'], {env, skip});
+        return this.execa(['make', '-C', directory, '-j', `${nproc}`, 'release'], {env, skip});
       };
 
       const installHeaders = (...subdirs) => {
@@ -643,12 +644,8 @@ function dependency(name, version) {
     path: function(prefix = path.join(__dirname, 'vendor')) {
       return path.join(prefix, this.basename());
     },
-    checksum: function() {
-      return dependencies[name]?.[version]?.checksum;
-    },
-    version: function() {
-      return version;
-    }
+    checksum: dependencies[name]?.[version]?.checksum,
+    version: version
   };
 }
 
@@ -663,7 +660,7 @@ function FetchCommand(name, {pretty_name, version, suffix, checksum, cmakeBuildT
     .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).');
 
   if (version) {
-    cmd.option('-v, --version <value>', 'Overrides version.', dependency(name).version());
+    cmd.option('-v, --version <value>', 'Overrides version.', dependency(name).version);
   }
 
   if (suffix) {
@@ -675,7 +672,7 @@ function FetchCommand(name, {pretty_name, version, suffix, checksum, cmakeBuildT
 
     cmd.option('-c, --checksum <value>', 'Overrides checksum.');
     cmd.hook('preAction', (thisCommand, actionCommand) => {
-      actionCommand.opts().checksum ??= dependency(name, actionCommand.opts().version).checksum();
+      actionCommand.opts().checksum ??= dependency(name, actionCommand.opts().version).checksum;
     });
   }
 
@@ -724,9 +721,9 @@ program
   .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).')
   .action(async (options) => {
     const directory = options.directory;
-    await steps(options).fetch_ittapi({directory, version: dependency('ittapi').version(), checksum: dependency('ittapi').checksum(), cmakeBuildType: 'Release'});
-    await steps(options).fetch_tracy({directory, version: dependency('tracy').version(), checksum: dependency('tracy').checksum(), components: ['lib']});
-    await steps(options).fetch_google_benchmark({directory, version: dependency('google-benchmark').version(), checksum: dependency('google-benchmark').checksum(), cmakeBuildType: 'Release'});
+    await steps(options).fetch_ittapi({directory, version: dependency('ittapi').version, checksum: dependency('ittapi').checksum, cmakeBuildType: 'Release'});
+    await steps(options).fetch_tracy({directory, version: dependency('tracy').version, checksum: dependency('tracy').checksum, components: ['lib']});
+    await steps(options).fetch_google_benchmark({directory, version: dependency('google-benchmark').version, checksum: dependency('google-benchmark').checksum, cmakeBuildType: 'Release'});
   });
 
 program
@@ -836,9 +833,9 @@ program
   .option('--shell', 'Keep shell open at the end.')
   .option('--fast', 'Skip npm modules and dependencies installation.')
   .option('--cmake-version <version>', 'Version of CMake to use')
-  .option('--ittapi-version <version>', 'Version of ITT API to use', dependency('ittapi').version())
-  .option('--tracy-version <version>', 'Version of Tracy to use', dependency('tracy').version())
-  .option('--google-benchmark-version <version>', '', dependency('google-benchmark').version())
+  .option('--ittapi-version <version>', 'Version of ITT API to use', dependency('ittapi').version)
+  .option('--tracy-version <version>', 'Version of Tracy to use', dependency('tracy').version)
+  .option('--google-benchmark-version <version>', '', dependency('google-benchmark').version)
   .option('--no-full-build', 'Build everything.')
   .option('--no-cmake-integration', 'Verify CMake integration.')
   .option('--no-run-tests', 'Run tests.')
@@ -854,7 +851,7 @@ program
       action: async () => {
         const {fast, fullBuild, cmakeIntegration, runTests, warningAsError} = options;
 
-        const cmake = options.cmakeVersion ? dependency('cmake3', options.cmakeVersion === true ? dependency('cmake3').version() : options.cmakeVersion) : undefined;
+        const cmake = options.cmakeVersion ? dependency('cmake3', options.cmakeVersion === true ? dependency('cmake3').version : options.cmakeVersion) : undefined;
         const ittapi = dependency('ittapi', options.ittapiVersion);
         const tracy = dependency('tracy', options.tracyVersion);
         const google_benchmark = dependency('google-benchmark', options.googleBenchmarkVersion);
@@ -866,12 +863,12 @@ program
 
         if (!fast) {
           if (cmake) {
-            await steps(options).fetch_cmake3({directory: vendorDir, version: cmake.version(), checksum: cmake.checksum()});
+            await steps(options).fetch_cmake3({directory: vendorDir, version: cmake.version, checksum: cmake.checksum});
           }
-          await steps(options).fetch_ittapi({directory: vendorDir, version: ittapi.version(), checksum: ittapi.checksum()});
-          await steps(options).fetch_tracy({directory: vendorDir, version: tracy.version(), checksum: tracy.checksum(), components: ['lib']});
+          await steps(options).fetch_ittapi({directory: vendorDir, version: ittapi.version, checksum: ittapi.checksum});
+          await steps(options).fetch_tracy({directory: vendorDir, version: tracy.version, checksum: tracy.checksum, components: ['lib']});
           if (fullBuild) {
-            await steps(options).fetch_google_benchmark({directory: vendorDir, version: google_benchmark.version(), checksum: google_benchmark.checksum()});
+            await steps(options).fetch_google_benchmark({directory: vendorDir, version: google_benchmark.version, checksum: google_benchmark.checksum});
           }
         }
 
