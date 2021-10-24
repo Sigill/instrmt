@@ -1,10 +1,18 @@
 #!/bin/bash
 
 PRETTY=
-test -t 1 && PRETTY=color
+test -t 1 && PRETTY=pretty
 
 has_unbuffer() {
     command -v unbuffer >/dev/null 2>&1
+}
+
+now_ms() {
+    date +%s.%3N
+}
+
+elapsed_time() {
+    bc -q <<< "scale=1; ($2 - $1 + 0.05) * 10 / 10"
 }
 
 QUIET=
@@ -23,12 +31,8 @@ done
 
 command -v shell-quote >/dev/null 2>&1 && quoted_command=$(shell-quote "$@") || quoted_command="${@@Q}"
 
-if [ -n "$PRETTY" ]; then
-    echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m "
-    echo "$quoted_command [started]"
-else
-    echo "$(date +%H:%M:%S) $quoted_command [started]"
-fi
+time_start=$(now_ms)
+echo "[STARTED] $quoted_command"
 
 if [ "$QUIET" = y ]; then
     TMPFILE=$(mktemp) || exit 1
@@ -49,22 +53,12 @@ else
     status=$?
 fi
 
+time_end=$(now_ms)
+
 if [ $status -eq 0 ]; then
-    if [ -n "$PRETTY" ]; then
-        echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m "
-        echo "$quoted_command [completed]"
-    else
-        echo "$(date +%H:%M:%S) $quoted_command [completed]"
-    fi
+    echo "[SUCCESS] $quoted_command [$(elapsed_time $time_start $time_end)s]"
 else
-    if [ -n "$PRETTY" ]; then
-        echo -ne "\e[90m[$(date +%H:%M:%S)]\e[39m "
-        echo "$quoted_command [failed]"
-        echo -e "\e[90m[$(date +%H:%M:%S)]\e[39m Command failed with exit code $status"
-    else
-        echo "$(date +%H:%M:%S) $quoted_command [failed]"
-        echo "[$(date +%H:%M:%S)] Command failed with exit code $status"
-    fi
+    echo "[FAILED] $quoted_command [$(elapsed_time $time_start $time_end)s]"
 fi
 
 exit $status

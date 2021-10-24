@@ -1,13 +1,14 @@
 {
   "dependencies": {
-    "commander": "^7.1.0",
+    "commander": "^7.2.0",
     "execa": "^5.0.0",
     "follow-redirects": "^1.13.3",
     "fs-extra": "^10.0.0",
-    "glob-fs": "^0.1.7",
+    "glob": "^7.1.7",
     "hasbin": "^1.2.3",
-    "listr": "^0.14.3",
+    "listr2": "^3.9.0",
     "mkdirp": "^1.0.4",
+    "param-case": "^3.0.4",
     "path-is-inside": "^1.0.2",
     "replace-in-file": "^6.2.0",
     "rimraf": "^3.0.2",
