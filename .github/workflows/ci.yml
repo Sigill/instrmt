@@ -16,9 +16,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - uses: actions/setup-node@v2
+    - uses: actions/setup-node@v3
       with:
         node-version: '16'
 
@@ -44,30 +44,30 @@ jobs:
         esac
 
     - name: ccache
-      uses: hendrikmuhs/ccache-action@v1
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ matrix.os }}-${{ matrix.compiler }}
 
     - name: Install node modules
-      run: npm i --production
+      run: npm i --production --progress=false
 
     - name: Cache ittapi
       id: cache-ittapi
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/ittapi-8cd2618
         key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-8cd2618
 
     - name: Cache tracy
       id: cache-tracy
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/tracy-0.7.6
         key: ${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.7.6
 
     - name: Cache google-benchmark
       id: cache-google-benchmark
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: vendor/google-benchmark-1.5.3
         key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.5.3
