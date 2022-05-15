@@ -10,8 +10,8 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-20.04]
-        compiler: [gcc9, gcc10, clang11, clang12]
+        os: [ubuntu-22.04]
+        compiler: [gcc9, gcc10, gcc11, clang11, clang12]
 
     runs-on: ${{ matrix.os }}
 
@@ -32,6 +32,10 @@ jobs:
           gcc10)
             echo CC=gcc-10 >> "$GITHUB_ENV"
             echo CXX=g++-10 >> "$GITHUB_ENV"
+            ;;
+          gcc11)
+            echo CC=gcc-11 >> "$GITHUB_ENV"
+            echo CXX=g++-11 >> "$GITHUB_ENV"
             ;;
           clang11)
             echo CC=clang-11 >> "$GITHUB_ENV"
