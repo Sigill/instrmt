@@ -13,7 +13,6 @@ import * as fse from 'fs-extra';
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
-import isPromise from 'p-is-promise';
 import hasbin from 'hasbin';
 import hasha from 'hasha';
 import mkdirp from 'mkdirp';
@@ -27,6 +26,8 @@ import semver from 'semver';
 import shellquote from 'shell-quote';
 import stream from 'stream';
 import tar from 'tar';
+import { ValueOrPromise } from 'value-or-promise';
+import { step } from '@sigill/watch-your-step';
 
 // https://techsparx.com/nodejs/esnext/dirname-es-modules.html
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -143,47 +144,6 @@ function pretty_command(command, {env, cwd} = {}) {
   return shellquote.quote([...prefix, ...command]);
 }
 
-function settle(action, onFullfilled, onRejected) {
-  onFullfilled ??= (...args) => args;
-  onRejected ??= (err) => { throw err; };
-  try {
-    let result = action();
-
-    if (isPromise(result)) {
-      return result.then(args => onFullfilled(args))
-        .catch(err => onRejected(err));
-    } else {
-      return onFullfilled(result);
-    }
-  } catch (err) {
-    onRejected(err);
-  }
-}
-
-function step({title, action = requiredArg('action'), skip} = {}) {
-  assert(!skip || title, 'Title required for skippable tasks');
-
-  if (title)
-    console.log(`[STARTED] ${title}`);
-
-  const skipped = skip && skip();
-  if (skipped) {
-    console.log(typeof skipped == 'string' ? `[SKIPPED] ${skipped}` : `[SKIPPED]`);
-    return;
-  }
-
-  const log_finish = (status, start) => {
-    if (title) {
-      const finish = new Date();
-      console.log(`[${status}] ${title} (${((finish - start)/1000).toFixed(1)}s)`);
-    }
-  };
-
-  const start = new Date();
-
-  return settle(action, (...args) => { log_finish('SUCCESS', start); return args; }, (err) => { log_finish('FAILED', start); throw err; });
-}
-
 const dependencies = {
   cmake3: {
     basename: 'cmake',
@@ -249,7 +209,9 @@ function steps({quiet} = {}) {
     withTempdir: function(prefix = path.join(os.tmpdir(), 'instrmt-'), action = requiredArg('action')) {
       const tempdir = fs.mkdtempSync(prefix);
       const that = this;
-      return settle(() => action(tempdir), (...args) => { that.cleanup(tempdir); return args; }, (err) => { that.cleanup(tempdir); throw err; });
+      return new ValueOrPromise(() => action(tempdir))
+        .then((...args) => { that.cleanup(tempdir); return args; }, (err) => { that.cleanup(tempdir); throw err; })
+        .resolve();
     },
     execa: function(command, {title, skip, env, cwd} = {}) {
       return step({
@@ -291,25 +253,17 @@ function steps({quiet} = {}) {
       });
     },
     extract: function(archive, dest, {strip_components} = {}) {
-      return step({
-        title: `Extract ${archive}`,
-        action: () => mkdirp(dest).then(() => tar.x({ file: archive, strip: strip_components, C: dest }))
-      });
+      return step(`Extract ${archive}`,
+                  () => mkdirp(dest).then(() => tar.x({ file: archive, strip: strip_components, C: dest })));
     },
-    download_and_extract: function(url, archive, checksum, dest, {strip_components} = {}) {
-      return step({
-        action: async () => {
-          await this.download(url, archive);
-          await this.checksum(archive, checksum);
-          await this.extract(archive, dest, {strip_components});
-        }
-      });
+    download_and_extract: async function(url, archive, checksum, dest, {strip_components} = {}) {
+      await this.download(url, archive);
+      await this.checksum(archive, checksum);
+      await this.extract(archive, dest, {strip_components});
     },
     cleanup: function(files) {
-      return step({
-        title: 'Cleanup',
-        action: () => as_array(files).forEach(e => rimraf.sync(e))
-      });
+      return step('Cleanup',
+                  () => as_array(files).forEach(e => rimraf.sync(e)));
     },
     fetch_cmake3: async function({directory = default_vendor_dir, version, checksum} = {}) {
       const d = dependency('cmake3', {version, prefix: directory});
@@ -337,16 +291,13 @@ function steps({quiet} = {}) {
           await this.download_and_extract(url, archive, checksum ?? d.checksum, dirs.src, {strip_components: 1});
           await this.execa(cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []})),
           await this.execa(cmake_build_command(dirs.build)),
-          await step({
-            title: 'Install',
-            action: () => {
-              const headers = glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)'));
-              install(headers, path.join(dirs.install, 'include'), {base: path.join(dirs.src, 'include')});
-              install(
-                path.join(dirs.build, 'bin', 'libittnotify.a'),
-                path.join(dirs.install, 'lib64')
-              );
-            }
+          await step('Install', () => {
+            const headers = glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)'));
+            install(headers, path.join(dirs.install, 'include'), {base: path.join(dirs.src, 'include')});
+            install(
+              path.join(dirs.build, 'bin', 'libittnotify.a'),
+              path.join(dirs.install, 'lib64')
+            );
           });
           this.cleanup(dirs.temp);
         }
@@ -370,11 +321,9 @@ function steps({quiet} = {}) {
             cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']})
           );
           await this.execa( cmake_build_command(dirs.build, {target: 'install'}) );
-          await step({
-            title: 'Drop dynamic libraries', // To force the use of the static ones when building tracy's capture & profiler.
-            action: () => {
-              glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f));
-            }
+          // To force the use of the static ones when building tracy's capture & profiler.
+          step( 'Drop dynamic libraries', () => {
+            glob.sync(path.join(dirs.install, 'lib', 'libcapstone.so*')).forEach(f => fs.rmSync(f));
           });
           this.cleanup(dirs.temp);
         }
@@ -403,11 +352,8 @@ function steps({quiet} = {}) {
             )
           );
           await this.execa(cmake_build_command(dirs.build, {target: 'install'}));
-          step({
-            title: 'Fix pkgconfig file',
-            action: () => {
-              sed(path.join(dirs.install, 'lib/pkgconfig/glfw3.pc'), 'Requires.private:  x11', 'Requires:  x11');
-            }
+          step('Fix pkgconfig file', () => {
+            sed(path.join(dirs.install, 'lib/pkgconfig/glfw3.pc'), 'Requires.private:  x11', 'Requires:  x11');
           });
           this.cleanup(dirs.temp);
         }
@@ -454,52 +400,34 @@ function steps({quiet} = {}) {
             }
           });
           if (components.includes('lib')) {
-            await step({
-              title: 'Build library',
-              action: async () => {
-                const workdir = path.join(dirs.src, 'library', 'unix');
-                await buildStep(workdir);
-                await step({
-                  title: 'Install library',
-                  action: () => {
-                    install(path.join(workdir, 'libtracy-release.so'), path.join(dirs.install, 'lib'), {filename: 'libtracy.so'});
+            await step('Build library', async () => {
+              const workdir = path.join(dirs.src, 'library', 'unix');
+              await buildStep(workdir);
+              step('Install library', () => {
+                install(path.join(workdir, 'libtracy-release.so'), path.join(dirs.install, 'lib'), {filename: 'libtracy.so'});
 
-                    installHeaders();
-                    installHeaders('client');
-                    installHeaders('common');
-                  }
-                });
-              }
+                installHeaders();
+                installHeaders('client');
+                installHeaders('common');
+              });
             });
           }
           if (components.includes('capture')) {
-            await step({
-              title: 'Build capture tool',
-              action: async () => {
-                const workdir = path.join(dirs.src, 'capture', 'build', 'unix');
-                await buildStep(workdir, {extra_pc_dirs: [withCapstone].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'))});
-                await step({
-                  title: 'Install capture',
-                  action: () => {
-                    install(path.join(workdir, 'capture-release'), path.join(dirs.install, 'bin'), {filename: 'capture'});
-                  }
-                });
-              }
+            await step('Build capture tool', async () => {
+              const workdir = path.join(dirs.src, 'capture', 'build', 'unix');
+              await buildStep(workdir, {extra_pc_dirs: [withCapstone].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'))});
+              step('Install capture', () => {
+                install(path.join(workdir, 'capture-release'), path.join(dirs.install, 'bin'), {filename: 'capture'});
+              });
             });
           }
           if (components.includes('profiler')) {
-            await step({
-              title: 'Build profiler',
-              action: async () => {
-                const workdir = path.join(dirs.src, 'profiler', 'build', 'unix');
-                await buildStep(workdir, {extra_pc_dirs: [withCapstone, withGlfw].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'))});
-                await step({
-                  title: 'Install profiler',
-                  action: () => {
-                    install(path.join(workdir, 'Tracy-release'), path.join(dirs.install, 'bin'), {filename: 'tracy'});
-                  }
-                });
-              }
+            await step('Build profiler', async () => {
+              const workdir = path.join(dirs.src, 'profiler', 'build', 'unix');
+              await buildStep(workdir, {extra_pc_dirs: [withCapstone, withGlfw].filter(e => e).map(d => path.join(d, 'lib', 'pkgconfig'))});
+              step('Install profiler', () => {
+                install(path.join(workdir, 'Tracy-release'), path.join(dirs.install, 'bin'), {filename: 'tracy'});
+              });
             });
           }
           this.cleanup(dirs.temp);
@@ -551,8 +479,8 @@ function steps({quiet} = {}) {
         {cmake, args}
       );
 
-      await step({title: 'Check CMake build tree integration', action: () => build_examples('example-from-build', instrmt_build_dir)});
-      await step({title: 'Check CMake install tree integration', action: () => build_examples('example-from-install', path.join(instrmt_install_dir, 'share', 'cmake', 'instrmt'))});
+      await step('Check CMake build tree integration', () => build_examples('example-from-build', instrmt_build_dir));
+      await step('Check CMake install tree integration', () => build_examples('example-from-install', path.join(instrmt_install_dir, 'share', 'cmake', 'instrmt')));
     }
   };
 }
@@ -675,11 +603,10 @@ function start_ci_container(options) {
     'bash', '-c', command_string
   ];
 
-  return step({
-    title: shellquote.quote(docker_command),
-    action: () => execa(docker_command[0], docker_command.slice(1), {stdio: 'inherit'})
-      .catch(err => { throw new Error(`Command failed with exit code ${err.exitCode}`); })
-  });
+  return step(shellquote.quote(docker_command),
+              () => execa(docker_command[0], docker_command.slice(1), {stdio: 'inherit'})
+                .catch(err => { throw new Error(`Command failed with exit code ${err.exitCode}`); })
+  );
 }
 
 function valid_compiler(c) {
@@ -708,45 +635,42 @@ program
       return start_ci_container(options);
     }
 
-    return step({
-      title: 'CI',
-      action: async () => {
-        const ittapi = await steps(options).fetch_ittapi({version: options.ittapiVersion});
-        const tracy = await steps(options).fetch_tracy({version: options.tracyVersion, components: ['lib']});
-        const google_benchmark = await steps(options).fetch_google_benchmark({version: options.googleBenchmarkVersion});
+    return step('CI', async () => {
+      const ittapi = await steps(options).fetch_ittapi({version: options.ittapiVersion});
+      const tracy = await steps(options).fetch_tracy({version: options.tracyVersion, components: ['lib']});
+      const google_benchmark = await steps(options).fetch_google_benchmark({version: options.googleBenchmarkVersion});
 
-        if (options.cmakeVersion) {
-          const cmake3 = await steps(options).fetch_cmake3({version: options.cmakeVersion === true ? dependency('cmake3').version : options.cmakeVersion});
-          prependPath(path.join(cmake3.root, 'bin'));
-        }
-
-        await steps(options).withTempdir(path.join(os.tmpdir(), 'instrmt-'), async (tempdir) => {
-          const instrmt_bld = path.join(tempdir, 'instrmt-build');
-          const instrmt_dist = path.join(tempdir, 'instrmt-install');
-
-          const cmake_compiler_options = options.compiler ? [`-DCMAKE_CXX_COMPILER=${options.compiler.replace('gcc', 'g++').replace('clang', 'clang++')}`] : [];
-
-          await steps(options).execa(['cmake', '--version']);
-
-          await steps(options).execa(
-            cmake_configure_command(__dirname, instrmt_bld, {
-              buildType: 'Release', installPrefix: instrmt_dist, args: [
-                ...cmake_compiler_options,
-                '-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${ittapi.root}`,
-                '-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${tracy.root}`,
-                '-DBUILD_BENCHMARKS=ON', `-Dbenchmark_DIR=${path.join(google_benchmark.root, 'lib', 'cmake', 'benchmark')}`,
-                '-DBUILD_TESTING=ON', ...(options.werror ? ['-DCMAKE_CXX_FLAGS=-Werror'] : [])
-              ]
-            })
-          );
-
-          await steps(options).execa(cmake_build_command(instrmt_bld, {target: 'install'}));
-
-          await steps(options).execa(['ctest'], {cwd: instrmt_bld});
-
-          await steps(options).verify_instrmt_cmake_integration(tempdir, instrmt_bld, instrmt_dist, ittapi.root, tracy.root, {args: cmake_compiler_options});
-        });
+      if (options.cmakeVersion) {
+        const cmake3 = await steps(options).fetch_cmake3({version: options.cmakeVersion === true ? dependency('cmake3').version : options.cmakeVersion});
+        prependPath(path.join(cmake3.root, 'bin'));
       }
+
+      await steps(options).withTempdir(path.join(os.tmpdir(), 'instrmt-'), async (tempdir) => {
+        const instrmt_bld = path.join(tempdir, 'instrmt-build');
+        const instrmt_dist = path.join(tempdir, 'instrmt-install');
+
+        const cmake_compiler_options = options.compiler ? [`-DCMAKE_CXX_COMPILER=${options.compiler.replace('gcc', 'g++').replace('clang', 'clang++')}`] : [];
+
+        await steps(options).execa(['cmake', '--version']);
+
+        await steps(options).execa(
+          cmake_configure_command(__dirname, instrmt_bld, {
+            buildType: 'Release', installPrefix: instrmt_dist, args: [
+              ...cmake_compiler_options,
+              '-DINSTRMT_BUILD_ITT_ENGINE=ON', `-DVTUNE_ROOT=${ittapi.root}`,
+              '-DINSTRMT_BUILD_TRACY_ENGINE=ON', `-DTRACY_ROOT=${tracy.root}`,
+              '-DBUILD_BENCHMARKS=ON', `-Dbenchmark_DIR=${path.join(google_benchmark.root, 'lib', 'cmake', 'benchmark')}`,
+              '-DBUILD_TESTING=ON', ...(options.werror ? ['-DCMAKE_CXX_FLAGS=-Werror'] : [])
+            ]
+          })
+        );
+
+        await steps(options).execa(cmake_build_command(instrmt_bld, {target: 'install'}));
+
+        await steps(options).execa(['ctest'], {cwd: instrmt_bld});
+
+        await steps(options).verify_instrmt_cmake_integration(tempdir, instrmt_bld, instrmt_dist, ittapi.root, tracy.root, {args: cmake_compiler_options});
+      });
     });
   });
 

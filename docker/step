@@ -64,7 +64,7 @@ main() {
     if [ $status -eq 0 ]; then
         echo "[SUCCESS] $quoted_command [$(elapsed_time $time_start $time_end)s]"
     else
-        echo "[FAILED] $quoted_command [$(elapsed_time $time_start $time_end)s]"
+        echo "[FAILURE] $quoted_command [$(elapsed_time $time_start $time_end)s]"
     fi
 
     exit $status

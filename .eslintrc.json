@@ -1,8 +1,9 @@
 {
   "parser": "babel-eslint",
   "parserOptions": {
-    "sourceType": "module",
-    "allowImportExportEverywhere": true
+    "allowImportExportEverywhere": true,
+    "ecmaVersion": 12,
+    "sourceType": "module"
   },
   "env": {
     "node": true,
@@ -10,9 +11,6 @@
     "es2021": true
   },
   "extends": "eslint:recommended",
-  "parserOptions": {
-    "ecmaVersion": 12
-  },
   "rules": {
     "indent": [
       "error",
