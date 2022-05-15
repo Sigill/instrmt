@@ -27,9 +27,12 @@
   },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
-    "eslint": "^7.27.0"
+    "eslint": "^7.27.0",
+    "nodemon": "^2.0.15"
   },
   "scripts": {
-    "lint": "eslint bootstrap.js"
+    "lint": "eslint bootstrap.js",
+    "watch": "nodemon",
+    "watch:full": "nodemon --exec './docker/step node bootstrap.js ci'"
   }
 }
