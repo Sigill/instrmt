@@ -4,15 +4,15 @@ global_agent.bootstrap();
 
 import arrify from 'arrify';
 import assert from 'assert';
-import commander from 'commander';
+import * as commander from 'commander';
 import dargs from 'dargs';
-import execa from 'execa';
+import { execa, execaSync } from 'execa';
 import fs from 'fs';
 import * as fse from 'fs-extra';
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
-import hasbin from 'hasbin';
+import which from 'which';
 import hasha from 'hasha';
 import mkdirp from 'mkdirp';
 import os from 'os';
@@ -108,7 +108,7 @@ function isDirectory(p: string) {
 }
 
 function unbuffer(command: string[]): [string, string[]] {
-  if (hasbin.sync('unbuffer')) {
+  if (which.sync('unbuffer')) {
     return ['unbuffer', command];
   } else {
     return [command[0], command.slice(1)];
@@ -575,9 +575,9 @@ program
   });
 
 async function start_ci_container(options: any): Promise<void> {
-  const branch = execa.sync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
+  const branch = execaSync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
 
-  execa.sync('docker', ['volume', 'create', 'instrmt-build-cache']);
+  execaSync('docker', ['volume', 'create', 'instrmt-build-cache']);
 
   const step_exe = options.quiet ? `step -q` : `step`;
 

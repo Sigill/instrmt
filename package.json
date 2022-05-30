@@ -7,14 +7,13 @@
   "dependencies": {
     "@sigill/watch-your-step": "^0.1.5",
     "arrify": "^3.0.0",
-    "commander": "^8.0.0",
+    "commander": "^9.3.0",
     "dargs": "^8.1.0",
-    "execa": "^5.0.0",
+    "execa": "^6.1.0",
     "fs-extra": "^10.0.0",
-    "glob": "^7.1.7",
-    "global-agent": "^2.2.0",
-    "got": "^11.8.2",
-    "hasbin": "^1.2.3",
+    "glob": "^8.0.3",
+    "global-agent": "^3.0.0",
+    "got": "^12.1.0",
     "hasha": "^5.2.2",
     "is-interactive": "^2.0.0",
     "mkdirp": "^1.0.4",
@@ -26,11 +25,12 @@
     "shell-quote": "^1.7.2",
     "source-map-support": "^0.5.21",
     "tar": "^6.1.0",
-    "value-or-promise": "^1.0.11"
+    "value-or-promise": "^1.0.11",
+    "which": "^2.0.2"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.57",
-    "@swc/core": "^1.2.183",
+    "@swc/core": "^1.2.194",
     "@types/fs-extra": "^9.0.13",
     "@types/global-agent": "^2.1.1",
     "@types/hasbin": "^1.2.0",
@@ -40,6 +40,7 @@
     "@types/semver": "^7.3.9",
     "@types/shell-quote": "^1.7.1",
     "@types/tar": "^6.1.1",
+    "@types/which": "^2.0.1",
     "@typescript-eslint/eslint-plugin": "^5.23.0",
     "eslint": "^8.16.0",
     "ts-node": "^10.7.0"
