@@ -1,13 +1,21 @@
 {
+  "root": true,
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "sourceType": "module"
   },
   "env": {
     "node": true,
     "commonjs": true,
-    "es2021": true
+    "es2022": true
   },
-  "extends": "eslint:recommended",
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
   "rules": {
     "indent": [
       "error",
@@ -38,6 +46,7 @@
     "no-template-curly-in-string": [
       "error"
     ],
-    "multiline-ternary": ["error", "always-multiline"]
+    "multiline-ternary": ["error", "always-multiline"],
+    "@typescript-eslint/no-explicit-any": "off"
   }
 }
