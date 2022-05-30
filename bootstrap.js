@@ -208,9 +208,8 @@ function steps({quiet} = {}) {
   return {
     withTempdir: function(prefix = path.join(os.tmpdir(), 'instrmt-'), action = requiredArg('action')) {
       const tempdir = fs.mkdtempSync(prefix);
-      const that = this;
       return new ValueOrPromise(() => action(tempdir))
-        .then((...args) => { that.cleanup(tempdir); return args; }, (err) => { that.cleanup(tempdir); throw err; })
+        .then((...args) => { this.cleanup(tempdir); return args; }, (err) => { this.cleanup(tempdir); throw err; })
         .resolve();
     },
     execa: function(command, {title, skip, env, cwd} = {}) {
@@ -291,7 +290,7 @@ function steps({quiet} = {}) {
           await this.download_and_extract(url, archive, checksum ?? d.checksum, dirs.src, {strip_components: 1});
           await this.execa(cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []})),
           await this.execa(cmake_build_command(dirs.build)),
-          await step('Install', () => {
+          step('Install', () => {
             const headers = glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)'));
             install(headers, path.join(dirs.install, 'include'), {base: path.join(dirs.src, 'include')});
             install(
@@ -509,7 +508,7 @@ function FetchCommand(name, {pretty_name, version, suffix, checksum, cmakeBuildT
     assert(version, '"checkum" option requires "version" option');
 
     cmd.option('-c, --checksum <value>', 'Overrides checksum.');
-    cmd.hook('preAction', (thisCommand, actionCommand) => {
+    cmd.hook('preAction', (_, actionCommand) => {
       actionCommand.opts().checksum ??= dependency(name, {version: actionCommand.opts().version}).checksum;
     });
   }
@@ -536,12 +535,12 @@ FetchCommand('glfw', {pretty_name: 'GLFW', version: true, suffix: true, checksum
 FetchCommand('tracy', {pretty_name: 'Tracy', version: true, suffix: true, checksum: true})
   .addOption(new commander.Option('--components <value...>', 'Components to build.').choices(['lib', 'capture', 'profiler']).default(['lib']))
   .option('--with-glfw <directory>', 'Root directory of glfw (location of lib/pkgconfig/glfw3.pc).')
-  .hook('preAction', (thisCommand, actionCommand) => {
-    actionCommand.opts().withGlfw ??= dependency('glfw').root(actionCommand.opts().directory);
+  .hook('preAction', (_, actionCommand) => {
+    actionCommand.opts().withGlfw ??= dependency('glfw', {prefix: actionCommand.opts().directory}).root;
   })
   .option('--with-capstone <directory>', 'Root directory of capstone (location of lib/pkgconfig/capstone.pc).')
-  .hook('preAction', (thisCommand, actionCommand) => {
-    actionCommand.opts().withCapstone ??= dependency('capstone').root(actionCommand.opts().directory);
+  .hook('preAction', (_, actionCommand) => {
+    actionCommand.opts().withCapstone ??= dependency('capstone', {prefix: actionCommand.opts().directory}).root;
   })
   .action((options) => steps(options).fetch_tracy(options));
 
