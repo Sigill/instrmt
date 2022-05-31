@@ -7,13 +7,13 @@ import assert from 'assert';
 import * as commander from 'commander';
 import dargs from 'dargs';
 import { execa, execaSync } from 'execa';
-import fs from 'fs';
+import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
 import which from 'which';
 import hasha from 'hasha';
-import mkdirp from 'mkdirp';
 import os from 'os';
 import path from 'path';
 import pathIsInside from 'path-is-inside';
@@ -70,7 +70,7 @@ function install(files: string | string[], dir: string, {filename, base}: {filen
   }
 
   const final_paths = files.map(f => finalPath(f)).map(f => path.dirname(f));
-  new Set(final_paths).forEach(d => mkdirp.sync(d));
+  new Set(final_paths).forEach(d => fs.mkdirSync(d, { recursive: true }));
 
   files.forEach(f => {
     fs.cpSync(f, finalPath(f), { preserveTimestamps: true });
@@ -241,7 +241,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
       return step({
         title: `Download ${url}`,
         skip: () => fs.existsSync(file) && (quiet || `${file} already exists`),
-        action: () => mkdirp(path.dirname(file)).then(() => pipeline(got.stream(url), fs.createWriteStream(file)))
+        action: () => fsp.mkdir(path.dirname(file), { recursive: true }).then(() => pipeline(got.stream(url), fs.createWriteStream(file)))
       });
     },
     checksum: function (file: string, expected_checksum: string) {
@@ -258,7 +258,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
     },
     extract: function(archive: string, dest: string, {strip_components}: {strip_components?: number} = {}) {
       return step(`Extract ${archive}`,
-                  () => mkdirp(dest).then(() => tar.x({ file: archive, strip: strip_components, C: dest })));
+                  () => fsp.mkdir(dest, { recursive: true }).then(() => tar.x({ file: archive, strip: strip_components, C: dest })));
     },
     download_and_extract: async function(url: string, archive: string, checksum: string, dest: string, {strip_components}: {strip_components?: number} = {}) {
       await this.download(url, archive);
