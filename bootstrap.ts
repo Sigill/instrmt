@@ -8,13 +8,6 @@ import * as commander from 'commander';
 import dargs from 'dargs';
 import { execa, execaSync } from 'execa';
 import fs from 'fs';
-
-// import * as fse from 'fs-extra';
-// https://github.com/jprichardson/node-fs-extra/issues/746#issuecomment-922978998
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const fse = require('fs-extra');
-
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
@@ -80,7 +73,7 @@ function install(files: string | string[], dir: string, {filename, base}: {filen
   new Set(final_paths).forEach(d => mkdirp.sync(d));
 
   files.forEach(f => {
-    fse.copySync(f, finalPath(f), {preserveTimestamps : true});
+    fs.cpSync(f, finalPath(f), { preserveTimestamps: true });
   });
 }
 

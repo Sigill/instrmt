@@ -10,7 +10,6 @@
     "commander": "^9.3.0",
     "dargs": "^8.1.0",
     "execa": "^6.1.0",
-    "fs-extra": "^10.0.0",
     "glob": "^8.0.3",
     "global-agent": "^3.0.0",
     "got": "^12.1.0",
@@ -31,7 +30,6 @@
   "devDependencies": {
     "@swc/cli": "^0.1.57",
     "@swc/core": "^1.2.194",
-    "@types/fs-extra": "^9.0.13",
     "@types/global-agent": "^2.1.1",
     "@types/hasbin": "^1.2.0",
     "@types/mkdirp": "^1.0.2",
