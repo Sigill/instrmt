@@ -8,7 +8,13 @@ import * as commander from 'commander';
 import dargs from 'dargs';
 import { execa, execaSync } from 'execa';
 import fs from 'fs';
-import * as fse from 'fs-extra';
+
+// import * as fse from 'fs-extra';
+// https://github.com/jprichardson/node-fs-extra/issues/746#issuecomment-922978998
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const fse = require('fs-extra');
+
 import glob from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
@@ -93,7 +99,7 @@ function pretty_version(v: string) {
 function match_version(version: string, {tag = [], range}: {tag?: string | string[], range?: string} = {}) {
   version = pretty_version(version) || (() => { throw new Error('Not a version'); })();
 
-  if (arrify(tag as string | string[]).includes(version))
+  if (arrify(tag).includes(version))
     return true;
 
   if (range && semver.valid(version) && semver.satisfies(version, range)) {
@@ -131,58 +137,61 @@ function pretty_command(command: string[], {env, cwd}: {env?: Record<string, str
   return shellquote.quote([...prefix, ...command]);
 }
 
-interface Checksum { algorithm: string; hash: string; }
-
-type Dep = {
-  [k: string]: { checksum: Checksum; };
-} & {
-  basename?: string;
-  default_version: string;
-};
-
-const dependencies = {
+const dependencies: {
+  [k in 'cmake3' | 'ittapi' | 'capstone' | 'glfw' | 'tracy' | 'google-benchmark']: {
+    basename?: string;
+    default_version: string;
+    versions: {
+      [k: string]: { checksum: string; };
+    }
+  };
+} = {
   cmake3: {
     basename: 'cmake',
     default_version: '3.21.2',
-    '3.21.2': { checksum: { algorithm: 'md5', hash: '68d783b7a6c3ea4d2786cf157f9a6d29' } }
+    versions: {
+      '3.21.2': { checksum: 'md5:68d783b7a6c3ea4d2786cf157f9a6d29' }
+    }
   },
   ittapi: {
     default_version: '8cd2618',
-    '8cd2618': { checksum: { algorithm: 'md5', hash: '5920c512a7a7c8971f2ffe6f693ffff3' } }
+    versions: {
+      '8cd2618': { checksum: 'md5:5920c512a7a7c8971f2ffe6f693ffff3' }
+    }
   },
   capstone: {
     default_version: '4.0.2',
-    '4.0.2': { checksum: { algorithm: 'md5', hash: '8894344c966a948f1248e66c91b53e2c' } }
+    versions: {
+      '4.0.2': { checksum: 'md5:8894344c966a948f1248e66c91b53e2c' }
+    }
   },
   glfw: {
     default_version: '3.3.4',
-    '3.3.4': { checksum: { algorithm: 'md5', hash: '8f8e5e931ef61c6a8e82199aabffe65a' } }
+    versions: {
+      '3.3.4': { checksum: 'md5:8f8e5e931ef61c6a8e82199aabffe65a' }
+    }
   },
   tracy: {
     default_version: 'v0.7.6',
-    'v0.7.2': { checksum: { algorithm: 'md5', hash: 'bceb615c494c3f7ccb77ba3bae20b216' } },
-    'v0.7.6': { checksum: { algorithm: 'md5', hash: '828be21907a1bddf5762118cf9e3ff66' } }
+    versions: {
+      'v0.7.2': { checksum: 'md5:bceb615c494c3f7ccb77ba3bae20b216' },
+      'v0.7.6': { checksum: 'md5:828be21907a1bddf5762118cf9e3ff66' }
+    }
   },
   'google-benchmark': {
     default_version: 'v1.5.3',
-    'v1.5.3': { checksum: { algorithm: 'md5', hash: 'abb43ef7784eaf0f7a98aed560920f46' } }
+    versions: {
+      'v1.5.3': { checksum: 'md5:abb43ef7784eaf0f7a98aed560920f46' }
+    }
   }
-} as unknown as Record<string, Dep>;
+};
 
-function dependency(name: keyof typeof dependencies, {version, suffix, prefix = default_vendor_dir}: {version?: string, suffix?: string, prefix?: string} = {}):
- {
-  basename: string;
-  root: string;
-  checksum: { algorithm: string; hash: string; };
-  version: string;
-  build_directories: ({ buildInSource, skipInstall }?: { buildInSource?: boolean, skipInstall?: boolean }) => {src: string, build: string, install: string, temp: string[]};
-}
+function dependency(name: keyof typeof dependencies, {version, suffix, prefix = default_vendor_dir}: {version?: string, suffix?: string, prefix?: string} = {})
 {
-  assert(dependencies[name], `Unknown dependency ${name}`);
   version ||= dependencies[name].default_version;
   const basename = [dependencies[name].basename || name, pretty_version(version), suffix].filter(e => e).join('-');
   const root = path.join(prefix, basename);
-  const checksum = dependencies[name]?.[version]?.checksum;
+  const checksum = dependencies[name].versions?.[version]?.checksum;
 
   return {
     basename, root, checksum, version,
@@ -213,8 +222,8 @@ function steps({quiet}: {quiet?: boolean} = {}) {
     withTempdir: function<T>(prefix: string, action: (dir: string) => T) {
       const tempdir = fs.mkdtempSync(prefix);
       return new ValueOrPromise(() => action(tempdir))
-        .then((...args) => { this.cleanup(tempdir); return args; }, (err) => { this.cleanup(tempdir); throw err; })
-        .resolve();
+        .then(args => { this.cleanup(tempdir); return args; }, (err) => { this.cleanup(tempdir); throw err; })
+        .resolve() as T;
     },
     execa: function(command: string[], {title, skip, env, cwd}: {title?: string, skip?: () => boolean | string, env?: Record<string, string>, cwd?: string} = {}) {
       return step({
@@ -242,16 +251,15 @@ function steps({quiet}: {quiet?: boolean} = {}) {
         action: () => mkdirp(path.dirname(file)).then(() => pipeline(got.stream(url), fs.createWriteStream(file)))
       });
     },
-    checksum: function (file: string, expected_checksum: {algorithm: string, hash: string}) {
+    checksum: function (file: string, expected_checksum: string) {
       return step({
         title: `Verify checksum of ${file}`,
         skip: () => !expected_checksum && (quiet || 'Checksum not specified'),
-        action: () => {
-          const {algorithm, hash: expected_hash} = expected_checksum;
-          return hasha.fromFile(file, {algorithm}).then(actual_hash => {
-            if (actual_hash !== expected_hash)
-              throw new Error(`${algorithm}(${file}) = ${actual_hash} != ${expected_hash}`);
-          });
+        action: async () => {
+          const [algorithm, expected_hash] = expected_checksum.split(':', 2);
+          const actual_hash = await hasha.fromFile(file, { algorithm });
+          if (actual_hash !== expected_hash)
+            throw new Error(`${algorithm}(${file}) = ${actual_hash} != ${expected_hash}`);
         }
       });
     },
@@ -259,7 +267,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
       return step(`Extract ${archive}`,
                   () => mkdirp(dest).then(() => tar.x({ file: archive, strip: strip_components, C: dest })));
     },
-    download_and_extract: async function(url: string, archive: string, checksum: {algorithm: string, hash: string}, dest: string, {strip_components}: {strip_components?: number} = {}) {
+    download_and_extract: async function(url: string, archive: string, checksum: string, dest: string, {strip_components}: {strip_components?: number} = {}) {
       await this.download(url, archive);
       await this.checksum(archive, checksum);
       await this.extract(archive, dest, {strip_components});
@@ -268,7 +276,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
       return step('Cleanup',
                   () => arrify(files).forEach(e => rimraf.sync(e)));
     },
-    fetch_cmake3: async function({directory = default_vendor_dir, version, checksum}: {directory?: string, version?: string, checksum?: {algorithm: string, hash: string}} = {}) {
+    fetch_cmake3: async function({directory = default_vendor_dir, version, checksum}: {directory?: string, version?: string, checksum?: string} = {}) {
       const d = dependency('cmake3', {version, prefix: directory});
       const url = `https://github.com/Kitware/CMake/releases/download/v${d.version}/cmake-${d.version}-Linux-x86_64.tar.gz`;
       const archive = path.join(directory, `cmake-${d.version}-Linux-x86_64.tar.gz`);
@@ -281,7 +289,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
       return d;
     },
-    fetch_ittapi: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: {algorithm: string, hash: string}, cmakeBuildType?: string} = {}) {
+    fetch_ittapi: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string} = {}) {
       const d = dependency('ittapi', {version, prefix: directory, suffix});
       const dirs = d.build_directories();
       const url = `https://github.com/intel/ittapi/archive/${d.version}.tar.gz`;
@@ -308,7 +316,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
       return d;
     },
-    fetch_capstone: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: {algorithm: string, hash: string}, cmakeBuildType?: string} = {}) {
+    fetch_capstone: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string} = {}) {
       const d = dependency('capstone', {version, prefix: directory, suffix});
       const dirs = d.build_directories();
       const url = `https://github.com/aquynh/capstone/archive/${d.version}.tar.gz`;
@@ -334,9 +342,9 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
       return d;
     },
-    fetch_glfw: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: {algorithm: string, hash: string}, cmakeBuildType?: string} = {}) {
+    fetch_glfw: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string} = {}) {
       const d = dependency('glfw', {version, prefix: directory, suffix});
-      const dirs = d.build_directories({});
+      const dirs = d.build_directories();
       const url = `https://github.com/glfw/glfw/archive/${d.version}.tar.gz`;
       const archive = path.join(directory, `glfw-${d.version}.tar.gz`);
 
@@ -364,7 +372,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
       return d;
     },
-    fetch_tracy: async function({directory = default_vendor_dir, version, suffix, checksum, components = [], withGlfw, withCapstone}: {directory?: string, version?: string, suffix?: string, checksum?: {algorithm: string, hash: string}, cmakeBuildType?: string, components?: string[], withGlfw?: string, withCapstone?: string}) {
+    fetch_tracy: async function({directory = default_vendor_dir, version, suffix, checksum, components = [], withGlfw, withCapstone}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string, components?: string[], withGlfw?: string, withCapstone?: string}) {
       const d = dependency('tracy', {version, prefix: directory, suffix});
       const dirs = d.build_directories({buildInSource: true});
       const url = `https://github.com/wolfpld/tracy/archive/${d.version}.tar.gz`;
@@ -439,7 +447,7 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
       return d;
     },
-    fetch_google_benchmark: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: {algorithm: string, hash: string}, cmakeBuildType?: string} = {}) {
+    fetch_google_benchmark: async function({directory = default_vendor_dir, version, suffix, checksum, cmakeBuildType}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string} = {}) {
       const d = dependency('google-benchmark', {version, prefix: directory, suffix});
       const dirs = d.build_directories({buildInSource: true});
       const url = `https://github.com/google/benchmark/archive/${d.version}.tar.gz`;
@@ -490,6 +498,12 @@ function steps({quiet}: {quiet?: boolean} = {}) {
 
 function absolute_path(p: string) { return path.resolve(p); }
 
+function ensureChecksum(value: string) {
+  if (['md5', 'sha1', 'sha256', 'sha512'].some(a => value.startsWith(`${a}:`)))
+    return value;
+  throw new commander.InvalidArgumentError(`Invalid checksum syntax`);
+}
+
 const program = new commander.Command();
 
 function FetchCommand(name: keyof typeof dependencies, {pretty_name, version, suffix, checksum, cmakeBuildType}: {pretty_name?: string, version?: boolean, suffix?: boolean, checksum?: boolean, cmakeBuildType?: boolean} = {}) {
@@ -508,9 +522,9 @@ function FetchCommand(name: keyof typeof dependencies, {pretty_name, version, su
   }
 
   if (checksum) {
-    assert(version, '"checkum" option requires "version" option');
+    assert(version, '"checksum" option requires "version" option');
 
-    cmd.option('-c, --checksum <value>', 'Overrides checksum.');
+    cmd.option('-c, --checksum <value>', 'Overrides checksum.', ensureChecksum, undefined);
     cmd.hook('preAction', (_, actionCommand) => {
       actionCommand.opts().checksum ??= dependency(name, {version: actionCommand.opts().version}).checksum;
     });
