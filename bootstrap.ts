@@ -172,9 +172,9 @@ const dependencies: {
     }
   },
   'google-benchmark': {
-    default_version: 'v1.5.3',
+    default_version: 'v1.6.1',
     versions: {
-      'v1.5.3': { checksum: 'md5:abb43ef7784eaf0f7a98aed560920f46' }
+      'v1.6.1': { checksum: 'sha256:6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4' }
     }
   }
 };

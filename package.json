@@ -27,8 +27,6 @@
     "which": "^2.0.2"
   },
   "devDependencies": {
-    "@swc/cli": "^0.1.57",
-    "@swc/core": "^1.2.194",
     "@types/global-agent": "^2.1.1",
     "@types/hasbin": "^1.2.0",
     "@types/path-is-inside": "^1.0.0",
@@ -38,16 +36,13 @@
     "@types/tar": "^6.1.1",
     "@types/which": "^2.0.1",
     "@typescript-eslint/eslint-plugin": "^5.23.0",
-    "eslint": "^8.16.0",
-    "ts-node": "^10.7.0"
+    "eslint": "^8.16.0"
   },
   "scripts": {
     "watch": "nodemon",
-    "watch:full": "nodemon --exec './docker/step node bootstrap.js ci'",
+    "watch:full": "nodemon --exec './docker/step npm run bootstrap -- ci'",
     "lint": "eslint bootstrap.ts",
-    "bootstrap:ts-node": "ts-node-esm -T bootstrap.ts",
-    "bootstrap:swc": "ts-node-esm --swc bootstrap.ts",
-    "bootstrap:build": "tsc",
+    "prebootstrap": "test bootstrap.js -nt bootstrap.ts || tsc",
     "bootstrap": "node -r source-map-support/register bootstrap.js"
   }
 }

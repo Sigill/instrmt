@@ -57,7 +57,7 @@ jobs:
         key: ${{ matrix.os }}-${{ matrix.compiler }}
 
     - name: Install node modules
-      run: npm i --production --progress=false
+      run: npm i --progress=false
 
     - name: Cache ittapi
       id: cache-ittapi
@@ -77,10 +77,10 @@ jobs:
       id: cache-google-benchmark
       uses: actions/cache@v3
       with:
-        path: vendor/google-benchmark-1.5.3
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.5.3
+        path: vendor/google-benchmark-1.6.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.6.1
 
     - name: Configure and build
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        node bootstrap.js ci
+        npm run bootstrap -- ci
