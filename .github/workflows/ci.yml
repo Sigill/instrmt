@@ -54,7 +54,7 @@ jobs:
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{ matrix.os }}-${{ matrix.compiler }}
+        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}
 
     - name: Install node modules
       run: npm i --progress=false
@@ -67,21 +67,21 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/ittapi-3.23.0
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.23.0
+        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.23.0
 
     - name: Cache tracy
       id: cache-tracy
       uses: actions/cache@v3
       with:
-        path: vendor/tracy-0.7.6
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.7.6
+        path: vendor/tracy-0.8.1
+        key: 20220606202805-${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.8.1
 
     - name: Cache google-benchmark
       id: cache-google-benchmark
       uses: actions/cache@v3
       with:
         path: vendor/google-benchmark-1.6.1
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.6.1
+        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.6.1
 
     - name: Configure and build
       run: |

@@ -26,6 +26,7 @@ import stream from 'stream';
 import tar from 'tar';
 import { ValueOrPromise } from 'value-or-promise';
 import { step } from '@sigill/watch-your-step';
+import * as si from 'systeminformation';
 
 // https://techsparx.com/nodejs/esnext/dirname-es-modules.html
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -159,16 +160,17 @@ const dependencies: {
     }
   },
   glfw: {
-    default_version: '3.3.4',
+    default_version: '3.3.6',
     versions: {
-      '3.3.4': { checksum: 'md5:8f8e5e931ef61c6a8e82199aabffe65a' }
+      '3.3.6': { checksum: 'sha256:ed07b90e334dcd39903e6288d90fa1ae0cf2d2119fec516cf743a0a404527c02' }
     }
   },
   tracy: {
-    default_version: 'v0.7.6',
+    default_version: 'v0.8.1',
     versions: {
       'v0.7.2': { checksum: 'md5:bceb615c494c3f7ccb77ba3bae20b216' },
-      'v0.7.6': { checksum: 'md5:828be21907a1bddf5762118cf9e3ff66' }
+      'v0.7.6': { checksum: 'md5:828be21907a1bddf5762118cf9e3ff66' },
+      'v0.8.1': { checksum: 'sha256:004992012b2dc879a9f6d143cbf94d7ea30e88135db3ef08951605d214892891' }
     }
   },
   'google-benchmark': {
@@ -331,9 +333,7 @@ async function fetch_capstone(ctx: Context, {directory = default_vendor_dir, ver
     skip: () => isDirectory(dirs.install) && (ctx.quiet || `${dirs.install} already exists`),
     action: async () => {
       await download_and_extract(ctx, url, archive, checksum ?? d.checksum, dirs.src, {strip_components: 1});
-      await execute(ctx, ['patch', '-p1', '-d', dirs.src, '-i', path.join(__dirname, 'misc', 'capstone-pkgconfig-includedir.diff')]);
-      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']})
-      );
+      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: ['-DCAPSTONE_BUILD_TESTS=OFF']}));
       await execute(ctx, cmake_build_command(dirs.build, {target: 'install'}) );
       // To force the use of the static ones when building tracy's capture & profiler.
       step('Drop dynamic libraries', () => {
@@ -376,16 +376,18 @@ async function fetch_glfw(ctx: Context, {directory = default_vendor_dir, version
   return d;
 }
 
-async function fetch_tracy(ctx: Context, {directory = default_vendor_dir, version, suffix, checksum, components = [], withGlfw, withCapstone}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string, components?: string[], withGlfw?: string, withCapstone?: string}) {
+async function fetch_tracy(ctx: Context, {directory = default_vendor_dir, version, suffix, checksum, components = [], withGlfw, withCapstone, fallbackTimer}: {directory?: string, version?: string, suffix?: string, checksum?: string, cmakeBuildType?: string, components?: string[], withGlfw?: string, withCapstone?: string, fallbackTimer?: boolean}) {
   const d = dependency('tracy', {version, prefix: directory, suffix});
   const dirs = d.build_directories({buildInSource: true});
   const url = `https://github.com/wolfpld/tracy/archive/${d.version}.tar.gz`;
   const archive = path.join(directory, `tracy-${d.version}.tar.gz`);
 
   const buildStep = async (directory: string, {extra_pc_dirs = [], skip}: {extra_pc_dirs?: string[], skip?: () => string | boolean} = {}) => {
-    const env = extra_pc_dirs.length === 0
-      ? undefined
-      : {PKG_CONFIG_PATH: extra_pc_dirs.concat((process.env.PKG_CONFIG_PATH || '').split(path.delimiter).filter(e => e)).join(path.delimiter)};
+    const env: NodeJS.ProcessEnv = {};
+    if (extra_pc_dirs.length === 0) {
+      env.PKG_CONFIG_PATH = extra_pc_dirs.concat((process.env.PKG_CONFIG_PATH || '').split(path.delimiter).filter(e => e)).join(path.delimiter);
+    }
+
     return execute(ctx, ['make', '-C', directory, '-j', `${nproc}`, 'release'], {env, skip});
   };
 
@@ -393,6 +395,8 @@ async function fetch_tracy(ctx: Context, {directory = default_vendor_dir, versio
     const files = glob.sync(path.join(dirs.src, ...subdirs, '*.h?(pp)'));
     install(files, path.join(dirs.install, 'include', ...subdirs));
   };
+
+  const use_fallback_timer = await si.cpuFlags().then(flags => !flags.split(' ').includes('tsc_reliable'));
 
   await step({
     title: 'Fetch tracy',
@@ -405,11 +409,18 @@ async function fetch_tracy(ctx: Context, {directory = default_vendor_dir, versio
                     });
       step({
         title: `Fix includes`,
-        skip: () => !match_version(d.version, {tag: 'master', range: '>=0.7.6'}) && (ctx.quiet || `Not required for version ${d.version}`),
+        skip: () => !match_version(d.version, {range: '<0.7.6'}) && (ctx.quiet || `Not required for version ${d.version}`),
         action: () => {
           ['TracyWorker.cpp', 'TracySourceView.cpp'].forEach(f => {
-            sed(path.join(dirs.src, 'server', f), 'capstone.h', 'capstone/capstone.h');
+            sed(path.join(dirs.src, 'server', f), 'capstone/capstone.h', 'capstone.h');
           });
+        }
+      });
+      step({
+        title: `Enable legacy timers`,
+        skip: () => !(fallbackTimer ?? use_fallback_timer) && (ctx.quiet || `Not enabled`),
+        action: () => {
+          sed(path.join(dirs.src, 'library/unix/build.mk'), 'DEFINES +=', 'DEFINES += -DTRACY_TIMER_FALLBACK');
         }
       });
       if (components.includes('lib')) {
@@ -571,6 +582,7 @@ FetchCommand('tracy', {pretty_name: 'Tracy', version: true, suffix: true, checks
   .hook('preAction', (_, actionCommand) => {
     actionCommand.opts().withCapstone ??= dependency('capstone', {prefix: actionCommand.opts().directory}).root;
   })
+  .option('--fallback-timer', 'Use fallback timer, for hardware with no invariant TSC support (tracy >= 0.8).')
   .action(async (options) => {
     await fetch_tracy(options, options);
   });
@@ -698,7 +710,7 @@ program
 
         await execute(options, cmake_build_command(instrmt_bld, {target: 'install'}));
 
-        await execute(options, ['ctest'], {cwd: instrmt_bld});
+        await execute(options, ['ctest', '--output-on-failure'], {cwd: instrmt_bld});
 
         await verify_instrmt_cmake_integration(options, tempdir, instrmt_bld, instrmt_dist, ittapi.root, tracy.root, {args: cmake_compiler_options});
       });

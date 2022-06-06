@@ -31,7 +31,7 @@
         },
         "TRACY_ROOT": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/tracy-0.7.6"
+          "value": "${sourceDir}/vendor/tracy-0.8.1"
         }
       }
     },

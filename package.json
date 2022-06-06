@@ -22,6 +22,7 @@
     "semver": "^7.3.5",
     "shell-quote": "^1.7.2",
     "source-map-support": "^0.5.21",
+    "systeminformation": "^5.11.16",
     "tar": "^6.1.0",
     "value-or-promise": "^1.0.11",
     "which": "^2.0.2"
@@ -39,10 +40,12 @@
     "eslint": "^8.16.0"
   },
   "scripts": {
+    "prebootstrap": "test bootstrap.js -nt bootstrap.ts || tsc",
+    "bootstrap": "node -r source-map-support/register bootstrap.js",
+    "build:docker": "npm run bootstrap -- ci --docker",
+    "build:docker:full": "npm run build:docker -- --no-docker-cache",
     "watch": "nodemon",
     "watch:full": "nodemon --exec './docker/step npm run bootstrap -- ci'",
-    "lint": "eslint bootstrap.ts",
-    "prebootstrap": "test bootstrap.js -nt bootstrap.ts || tsc",
-    "bootstrap": "node -r source-map-support/register bootstrap.js"
+    "lint": "eslint bootstrap.ts"
   }
 }

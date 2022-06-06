@@ -1,13 +1,16 @@
 function(find_tracy)
   set(TRACY_ROOT "" CACHE PATH "Root directory of Tracy")
 
-  find_library(TRACY_LIBRARY tracy HINTS $ENV{TRACY_ROOT}/lib ${TRACY_ROOT}/lib)
-  find_path(TRACY_INCLUDE_DIR Tracy.hpp HINTS $ENV{TRACY_ROOT}/include ${TRACY_ROOT}/include)
-  mark_as_advanced(TRACY_LIBRARY TRACY_INCLUDE_DIR)
-
-  if (NOT TRACY_LIBRARY OR NOT TRACY_INCLUDE_DIR)
-    message(FATAL_ERROR "Unable to find Tracy's library, please set TRACY_ROOT")
+  if(NOT OLD_TRACY_ROOT STREQUAL TRACY_ROOT)
+    message("TRACY_ROOT was changed from ${OLD_TRACY_ROOT} to ${TRACY_ROOT}")
+    set(OLD_VTUNE_ROOT ${VTUNE_ROOT} CACHE INTERNAL "Previous value for TRACY_ROOT")
+    unset(TRACY_LIBRARY CACHE)
+    unset(TRACY_INCLUDE_DIR CACHE)
   endif()
+
+  find_library(TRACY_LIBRARY tracy HINTS $ENV{TRACY_ROOT}/lib ${TRACY_ROOT}/lib REQUIRED)
+  find_path(TRACY_INCLUDE_DIR Tracy.hpp HINTS $ENV{TRACY_ROOT}/include ${TRACY_ROOT}/include REQUIRED)
+  mark_as_advanced(TRACY_LIBRARY TRACY_INCLUDE_DIR)
 
   add_library(tracy SHARED IMPORTED)
   set_target_properties(tracy PROPERTIES
@@ -35,13 +38,9 @@ function(find_itt)
     unset(ITTNOTIFY_INCLUDE_DIR CACHE)
   endif()
 
-  find_library(ITTNOTIFY_LIBRARY ittnotify HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES ${VTUNE_LIB_DIR})
-  find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES include)
+  find_library(ITTNOTIFY_LIBRARY ittnotify HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES ${VTUNE_LIB_DIR} REQUIRED)
+  find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES include REQUIRED)
   mark_as_advanced(ITTNOTIFY_LIBRARY ITTNOTIFY_INCLUDE_DIR)
-
-  if (NOT ITTNOTIFY_LIBRARY OR NOT ITTNOTIFY_INCLUDE_DIR)
-    message(FATAL_ERROR "Unable to find ittnotify library, please set VTUNE_ROOT")
-  endif()
 
   add_library(ittnotify STATIC IMPORTED)
   set_target_properties(ittnotify PROPERTIES
