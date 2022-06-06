@@ -59,6 +59,9 @@ jobs:
     - name: Install node modules
       run: npm i --progress=false
 
+    - name: Run eslint
+      run: npm run lint
+
     - name: Cache ittapi
       id: cache-ittapi
       uses: actions/cache@v3
