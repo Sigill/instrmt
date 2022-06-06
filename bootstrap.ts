@@ -592,6 +592,10 @@ program
     await fetch_google_benchmark(options, {directory, cmakeBuildType: 'Release'});
   });
 
+function* yield_if(cond: boolean, ...elements: any[]) {
+  if (cond) yield* elements;
+}
+
 async function start_ci_container(options: any): Promise<void> {
   const branch = execaSync('git', ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.toString();
 
@@ -599,39 +603,36 @@ async function start_ci_container(options: any): Promise<void> {
 
   const step_exe = options.quiet ? `step -q` : `step`;
 
-  const commands = [
+  let commands = [
     `${step_exe} git clone --depth 1 -b ${branch} /repo /src`,
-    `${step_exe} mkdir -p /cache/node_modules /cache/vendor`,
-    `${step_exe} ln -snf /cache/vendor /src/vendor`,
-    // npm does not allow node_modules to be a symlink, use rsync to synchronize it instead.
-    `${step_exe} rsync -a /cache/node_modules/ /src/node_modules/`,
-    `${step_exe} npm i --production --prefer-offline --no-audit --progress=false`,
-    `${step_exe} rsync -a /src/node_modules/ /cache/node_modules/`,
+    ...yield_if(options.dockerCache,
+                `${step_exe} mkdir -p /cache/node_modules /cache/vendor`,
+                `${step_exe} ln -snf /cache/vendor /src/vendor`,
+                // npm does not allow node_modules to be a symlink, use rsync to synchronize it instead.
+                `${step_exe} rsync -a /cache/node_modules/ /src/node_modules/`),
+    `${step_exe} npm i --prefer-offline --no-audit --progress=false`,
+    ...yield_if(options.dockerCache,
+                `${step_exe} rsync -a /src/node_modules/ /cache/node_modules/`),
     shellquote.quote([
-      'step', 'node', 'bootstrap.js', 'ci', // Not step -q otherwise there would be no output
+      'step', 'npm', 'run', 'bootstrap', '--', 'ci', // Not step -q otherwise there would be no output
       ...dargs(options, {includes: ['quiet'], ignoreFalse: true}),
       ...dargs(options, {includes: ['werror'], ignoreTrue: true}),
       ...dargs(options, {includes: ['compiler', 'cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion']}),
     ])
-  ];
-
-  let command_string = commands.join(' && ');
+  ].join(' && ');
 
   if (options.shell) {
     if (!isInteractive())
       throw new Error('Host terminal is not a TTY, the --shell option cannot be used.');
-    command_string = `${command_string} ; bash`;
+    commands = `${commands} ; bash`;
   }
 
-  const shellFlags = function*() {
-    if (options.shell) yield '-i';
-    if (options.shell || isInteractive()) yield '-t';
-  };
-
   const docker_command = [
-    'docker', 'run', '--rm', ...shellFlags(), '-v', `${__dirname}:/repo:ro`, '--mount', 'source=instrmt-build-cache,target=/cache',
+    'docker', 'run', '--rm', '-v', `${__dirname}:/repo:ro`,
+    ...yield_if(options.shell, '-i'), ...yield_if(options.shell || isInteractive(), '-t'),
+    ...(options.dockerCache ? ['--mount', 'source=instrmt-build-cache,target=/cache'] : []),
     'instrmt-build',
-    'bash', '-c', command_string
+    'bash', '-c', commands
   ];
 
   await step(shellquote.quote(docker_command),
@@ -653,6 +654,7 @@ function prependPath(...values: string[]) {
 program
   .command('ci')
   .option('--docker', 'Run on a fresh clone in a docker container.')
+  .option('--no-docker-cache', 'Do not use docker volume for cache.')
   .option('--shell', 'Keep shell open at the end.')
   .option('-c, --compiler <name>', 'Compiler to use.', valid_compiler)
   .option('--ittapi-version <version>', 'Version of ITT API to use.')
@@ -676,13 +678,13 @@ program
         prependPath(path.join(cmake3.root, 'bin'));
       }
 
+      await execute(options, ['cmake', '--version']);
+
       await withTempdir(path.join(os.tmpdir(), 'instrmt-'), async (tempdir) => {
         const instrmt_bld = path.join(tempdir, 'instrmt-build');
         const instrmt_dist = path.join(tempdir, 'instrmt-install');
 
         const cmake_compiler_options = options.compiler ? [`-DCMAKE_CXX_COMPILER=${options.compiler.replace('gcc', 'g++').replace('clang', 'clang++')}`] : [];
-
-        await execute(options, ['cmake', '--version']);
 
         await execute(options, cmake_configure_command(__dirname, instrmt_bld, {
           buildType: 'Release', installPrefix: instrmt_dist, args: [
