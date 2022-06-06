@@ -141,15 +141,15 @@ const dependencies: {
 } = {
   cmake3: {
     basename: 'cmake',
-    default_version: '3.21.2',
+    default_version: '3.23.2',
     versions: {
-      '3.21.2': { checksum: 'md5:68d783b7a6c3ea4d2786cf157f9a6d29' }
+      '3.23.2': { checksum: 'sha256:aaced6f745b86ce853661a595bdac6c5314a60f8181b6912a0a4920acfa32708' }
     }
   },
   ittapi: {
-    default_version: '8cd2618',
+    default_version: 'v3.23.0',
     versions: {
-      '8cd2618': { checksum: 'md5:5920c512a7a7c8971f2ffe6f693ffff3' }
+      'v3.23.0': { checksum: 'sha256:9af1231808c602c2f7a66924c8798b1741d3aa4b15f3874d82ca7a89b5dbb1b1' }
     }
   },
   capstone: {
@@ -660,7 +660,7 @@ program
   .option('--ittapi-version <version>', 'Version of ITT API to use.')
   .option('--tracy-version <version>', 'Version of Tracy to use.')
   .option('--google-benchmark-version <version>', 'Version of Google Benchmark to use.')
-  .option('--cmake-version [version]', 'Version of CMake to use.')
+  .option('--cmake-version [version]', 'Version of CMake to use (default: use system version).')
   .option('--no-werror', 'Do not build with -Werror.')
   .option('-q, --quiet', 'Hide non-essential messages (e.g. only display external commands output if they fail).')
   .action(async (options): Promise<void> => {

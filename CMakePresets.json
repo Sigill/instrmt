@@ -27,7 +27,7 @@
         "BUILD_BENCHMARKS": false,
         "VTUNE_ROOT": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/ittapi-8cd2618"
+          "value": "${sourceDir}/vendor/ittapi-3.23.0"
         },
         "TRACY_ROOT": {
           "type": "PATH",
@@ -42,7 +42,7 @@
         "BUILD_BENCHMARKS": true,
         "benchmark_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/google-benchmark-1.5.3/lib/cmake/benchmark"
+          "value": "${sourceDir}/vendor/google-benchmark-1.6.1/lib/cmake/benchmark"
         }
       }
     },

@@ -27,6 +27,14 @@ function(find_itt)
   endif()
 
   set(VTUNE_ROOT /opt/intel/vtune_profiler CACHE PATH "Root directory of VTune's profiler")
+
+  if(NOT OLD_VTUNE_ROOT STREQUAL VTUNE_ROOT)
+    message("VTUNE_ROOT was changed from ${OLD_VTUNE_ROOT} to ${VTUNE_ROOT}")
+    set(OLD_VTUNE_ROOT ${VTUNE_ROOT} CACHE INTERNAL "Previous value for VTUNE_ROOT")
+    unset(ITTNOTIFY_LIBRARY CACHE)
+    unset(ITTNOTIFY_INCLUDE_DIR CACHE)
+  endif()
+
   find_library(ITTNOTIFY_LIBRARY ittnotify HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES ${VTUNE_LIB_DIR})
   find_path(ITTNOTIFY_INCLUDE_DIR ittnotify.h HINTS "${VTUNE_ROOT}" ENV VTUNE_ROOT PATH_SUFFIXES include)
   mark_as_advanced(ITTNOTIFY_LIBRARY ITTNOTIFY_INCLUDE_DIR)
