@@ -9,21 +9,21 @@ import dargs from 'dargs';
 import { execa, execaSync } from 'execa';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
-import glob from 'glob';
+import { glob } from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
 import which from 'which';
-import hasha from 'hasha';
+import { hashFile } from 'hasha';
 import os from 'os';
 import path from 'path';
 import pathIsInside from 'path-is-inside';
 import { promisify } from 'util';
-import replaceInFile, { ReplaceInFileConfig } from 'replace-in-file';
-import rimraf from 'rimraf';
+import { replaceInFileSync, ReplaceInFileConfig } from 'replace-in-file';
+import { rimraf } from 'rimraf';
 import semver from 'semver';
 import shellquote from 'shell-quote';
 import stream from 'stream';
-import tar from 'tar';
+import * as tar from 'tar';
 import { ValueOrPromise } from 'value-or-promise';
 import { step } from '@sigill/watch-your-step';
 import * as si from 'systeminformation';
@@ -78,8 +78,8 @@ function install(files: string | string[], dir: string, {filename, base}: {filen
   });
 }
 
-function sed(files: string | string[], from: ReplaceInFileConfig['from'], to: ReplaceInFileConfig['to']) {
-  replaceInFile.sync({files, from, to})
+async function sed(files: string | string[], from: ReplaceInFileConfig['from'], to: ReplaceInFileConfig['to']) {
+  replaceInFileSync({files, from, to})
     .filter(result => !result.hasChanged)
     .forEach(result => { throw new Error(`${result.file}: No match for ${from}`); });
 }
@@ -262,7 +262,7 @@ function verifyChecksum(ctx: Context, file: string, expected_checksum: string) {
     skip: () => !expected_checksum && (ctx.quiet || 'Checksum not specified'),
     action: async () => {
       const [algorithm, expected_hash] = expected_checksum.split(':', 2);
-      const actual_hash = await hasha.fromFile(file, { algorithm });
+      const actual_hash = await hashFile(file, { algorithm });
       if (actual_hash !== expected_hash)
         throw new Error(`${algorithm}(${file}) = ${actual_hash} != ${expected_hash}`);
     }
@@ -305,8 +305,8 @@ async function fetch_ittapi(ctx: Context, {directory = default_vendor_dir, versi
     skip: () => isDirectory(dirs.install) && (ctx.quiet || `${dirs.install} already exists`),
     action: async () => {
       await download_and_extract(ctx, url, archive, checksum ?? d.checksum, dirs.src, {strip_components: 1});
-      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []})),
-      await execute(ctx, cmake_build_command(dirs.build)),
+      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []}));
+      await execute(ctx, cmake_build_command(dirs.build));
       step('Install', () => {
         const headers = glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)'));
         install(headers, path.join(dirs.install, 'include'), {base: path.join(dirs.src, 'include')});
