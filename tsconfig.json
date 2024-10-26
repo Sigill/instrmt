@@ -2,9 +2,9 @@
   "compilerOptions": {
     "target": "es2021",
     "lib": [],
-    "module": "es2022",
+    "module": "nodenext",
     "rootDir": "./",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "removeComments": true,
     "inlineSourceMap": true,
     "newLine": "lf",
