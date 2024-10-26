@@ -616,6 +616,7 @@ async function start_ci_container(options: any): Promise<void> {
   const step_exe = options.quiet ? `step -q` : `step`;
 
   let commands = [
+    `${step_exe} git config --global --add safe.directory /repo/.git`,
     `${step_exe} git clone --depth 1 -b ${branch} /repo /src`,
     ...yield_if(options.dockerCache,
                 `${step_exe} mkdir -p /cache/node_modules /cache/vendor`,
