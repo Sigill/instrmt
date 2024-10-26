@@ -10,8 +10,29 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-22.04]
-        compiler: [gcc9, gcc10, gcc11, clang12, clang13, clang14]
+        include:
+          - os: ubuntu-22.04
+            compiler: gcc10
+          - os: ubuntu-22.04
+            compiler: gcc11
+          - os: ubuntu-22.04
+            compiler: clang13
+          - os: ubuntu-22.04
+            compiler: clang14
+          - os: ubuntu-22.04
+            compiler: clang15
+          - os: ubuntu-24.04
+            compiler: gcc12
+          - os: ubuntu-24.04
+            compiler: gcc13
+          - os: ubuntu-24.04
+            compiler: gcc14
+          - os: ubuntu-24.04
+            compiler: clang16
+          - os: ubuntu-24.04
+            compiler: clang17
+          - os: ubuntu-24.04
+            compiler: clang18
 
     runs-on: ${{ matrix.os }}
 
@@ -25,10 +46,6 @@ jobs:
     - name: Enable compiler
       run: |
         case ${{ matrix.compiler }} in
-          gcc9)
-            echo CC=gcc-9 >> "$GITHUB_ENV"
-            echo CXX=g++-9 >> "$GITHUB_ENV"
-            ;;
           gcc10)
             echo CC=gcc-10 >> "$GITHUB_ENV"
             echo CXX=g++-10 >> "$GITHUB_ENV"
@@ -37,9 +54,17 @@ jobs:
             echo CC=gcc-11 >> "$GITHUB_ENV"
             echo CXX=g++-11 >> "$GITHUB_ENV"
             ;;
-          clang12)
-            echo CC=clang-12 >> "$GITHUB_ENV"
-            echo CXX=clang++-12 >> "$GITHUB_ENV"
+          gcc12)
+            echo CC=gcc-12 >> "$GITHUB_ENV"
+            echo CXX=g++-12 >> "$GITHUB_ENV"
+            ;;
+          gcc13)
+            echo CC=gcc-13 >> "$GITHUB_ENV"
+            echo CXX=g++-13 >> "$GITHUB_ENV"
+            ;;
+          gcc14)
+            echo CC=gcc-14 >> "$GITHUB_ENV"
+            echo CXX=g++-14 >> "$GITHUB_ENV"
             ;;
           clang13)
             echo CC=clang-13 >> "$GITHUB_ENV"
@@ -49,12 +74,28 @@ jobs:
             echo CC=clang-14 >> "$GITHUB_ENV"
             echo CXX=clang++-14 >> "$GITHUB_ENV"
             ;;
+          clang15)
+            echo CC=clang-15 >> "$GITHUB_ENV"
+            echo CXX=clang++-15 >> "$GITHUB_ENV"
+            ;;
+          clang16)
+            echo CC=clang-16 >> "$GITHUB_ENV"
+            echo CXX=clang++-16 >> "$GITHUB_ENV"
+            ;;
+          clang17)
+            echo CC=clang-17 >> "$GITHUB_ENV"
+            echo CXX=clang++-17 >> "$GITHUB_ENV"
+            ;;
+          clang18)
+            echo CC=clang-18 >> "$GITHUB_ENV"
+            echo CXX=clang++-18 >> "$GITHUB_ENV"
+            ;;
         esac
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}
+        key: ${{ matrix.os }}-${{ matrix.compiler }}
 
     - name: Install node modules
       run: npm i --progress=false
@@ -67,21 +108,21 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor/ittapi-3.23.0
-        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.23.0
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.23.0
 
     - name: Cache tracy
       id: cache-tracy
       uses: actions/cache@v3
       with:
         path: vendor/tracy-0.8.1
-        key: 20220606202805-${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.8.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.8.1
 
     - name: Cache google-benchmark
       id: cache-google-benchmark
       uses: actions/cache@v3
       with:
         path: vendor/google-benchmark-1.6.1
-        key: 20220606193621-${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.6.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.6.1
 
     - name: Configure and build
       run: |
