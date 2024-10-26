@@ -27,11 +27,11 @@
         "BUILD_BENCHMARKS": false,
         "VTUNE_ROOT": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/ittapi-3.23.0"
+          "value": "${sourceDir}/vendor/ittapi-3.25.3"
         },
-        "TRACY_ROOT": {
+        "Tracy_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/tracy-0.8.1"
+          "value": "${sourceDir}/vendor/tracy-0.11.1/share/Tracy"
         }
       }
     },
@@ -42,7 +42,7 @@
         "BUILD_BENCHMARKS": true,
         "benchmark_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/google-benchmark-1.6.1/lib/cmake/benchmark"
+          "value": "${sourceDir}/vendor/google-benchmark-1.9.0/lib/cmake/benchmark"
         }
       }
     },
@@ -55,9 +55,9 @@
           "type": "PATH",
           "value": "${sourceDir}/vendor/ittapi-master"
         },
-        "TRACY_ROOT": {
+        "Tracy_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/tracy-master"
+          "value": "${sourceDir}/vendor/tracy-master/share/Tracy"
         },
         "benchmark_DIR": {
           "type": "PATH",

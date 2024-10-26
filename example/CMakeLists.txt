@@ -5,7 +5,7 @@ find_package(Instrmt REQUIRED)
 
 include(../cmake/instrmt-macros.cmake)
 
-find_tracy()
+find_package(Tracy)
 find_itt()
 
 add_executable(example-cpp example.cpp)
