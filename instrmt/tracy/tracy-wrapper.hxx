@@ -1,7 +1,7 @@
 #ifndef INSTRMTTRACYWRAPPER_HXX
 #define INSTRMTTRACYWRAPPER_HXX
 
-#include <TracyC.h>
+#include <tracy/TracyC.h>
 
 #include <cstring>
 

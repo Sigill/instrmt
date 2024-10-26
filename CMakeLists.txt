@@ -10,6 +10,8 @@ project(
   LANGUAGES CXX
 )
 
+set(CMAKE_CXX_STANDARD 14)
+
 include(cmake/instrmt-macros.cmake)
 
 # For convenience, write libraries and executables in root of build tree.
@@ -61,11 +63,11 @@ endif()
 
 option(INSTRMT_BUILD_TRACY_ENGINE "" ON)
 if (INSTRMT_BUILD_TRACY_ENGINE)
-  find_tracy()
+  find_package(Tracy)
 
   # Tracy engine
   add_library(instrmt-tracy MODULE instrmt/tracy/tracy-engine.cxx)
-  target_link_libraries(instrmt-tracy PRIVATE instrmt tracy)
+  target_link_libraries(instrmt-tracy PRIVATE instrmt Tracy::TracyClient)
 
   # Tracy wrapper
   add_library(instrmt-tracy-wrapper INTERFACE)
@@ -75,7 +77,7 @@ if (INSTRMT_BUILD_TRACY_ENGINE)
     $<INSTALL_INTERFACE:include>
   )
   target_compile_definitions(instrmt-tracy-wrapper INTERFACE "INSTRMT_CXX_WRAPPER=\"instrmt/tracy/tracy-wrapper.hxx\"" "TRACY_ENABLE")
-  target_link_libraries(instrmt-tracy-wrapper INTERFACE tracy)
+  target_link_libraries(instrmt-tracy-wrapper INTERFACE Tracy::TracyClient)
 endif()
 
 # Install rules
