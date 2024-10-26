@@ -5,7 +5,7 @@
 #define TRACY_ENABLE
 #endif
 
-#include <TracyC.h>
+#include <tracy/TracyC.h>
 #include <cstring>
 
 namespace instrmt {
