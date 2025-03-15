@@ -7,9 +7,9 @@ RUN bash -c "$(wget -O - https://deb.nodesource.com/setup_23.x)"
 RUN apt-get install nodejs -y
 
 RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-RUN echo "deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-19 main" > /etc/apt/sources.list.d/llvm.list
+RUN echo "deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-20 main" > /etc/apt/sources.list.d/llvm.list
 RUN apt update
-RUN apt install -y clang-19
+RUN apt install -y clang-20
 
 RUN /usr/sbin/update-ccache-symlinks
 

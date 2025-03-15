@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 include(cmake/instrmt-macros.cmake)
 
-# For convenience, write libraries and executables in root of build tree.
+# For convenience, write libraries and executables at the root of the build tree.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
