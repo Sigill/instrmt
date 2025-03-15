@@ -1,22 +1,52 @@
 # Instrmt
 
-Instrmt is a C++ library providing a common API to multiple instrumentation/tracing/telemetry tools.
+**Instrmt** is a C++ library that provides a common API to multiple instrumentation/tracing/telemetry ecosystems.
 
-It currently supports three "instrumentation engines":
+It especially supports with:
 
-- _tty_: basic engine printing instrumentation results to the console.
-- _itt_: [Intel ITT API](https://software.intel.com/content/www/us/en/develop/articles/intel-itt-api-open-source.html), for VTune or [Intel SEAPI](https://github.com/intel/IntelSEAPI).
-- _tracy_: [Tracy profiler](https://github.com/wolfpld/tracy).
+- **itt**: Intel's [Instrumentation and Tracing Technology API (ITT API)](https://github.com/intel/ittapi).\
+  Used by [VTune](https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide/2025-0/instrumentation-and-tracing-technology-apis.html) and [Intel SEAPI](https://github.com/intel/IntelSEAPI) (discontinued).
+- **tracy**: [Tracy profiler](https://github.com/wolfpld/tracy).
 
-## API
+## Quick start
 
-All of Instrmt C++ API is defined by macros in `instrmt/instrmt.hxx`.
+```cmake
+# CMakeLists.txt
+cmake_minimum_required(VERSION 3.14)
+project(my_project)
+
+find_package(Instrmt)
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE instrmt)
+```
+
+```cpp
+// main.cpp
+#include <instrmt/instrmt.hxx>
+
+int main(int, char**) {
+  INSTRMT_FUNCTION();
+  // ...
+  return 0;
+}
+```
+
+```sh
+$ cmake -S . -B build/ -DInstrmt_DIR=
+$ cmake --build build/
+$ INSTRMT_ENGINE=/path/to/instrmt/lib/libinstrmt-tty.so ./build/app
+main                                     0.1 ms
+```
+
+## Instrumentation API
+
+All of the public Instrmt C++ API is defined by macros in `instrmt/instrmt.hxx`.
 
 ### Region markup
 
-A region define the start and end of a block of code (regions are similar to Intel's *Tasks* or Tracy's *Zones*).
+A region define the start and end of a block of code (regions are similar to Intel's _Tasks_ or Tracy's _Zones_).
 
-The following macros use RAII to bind the end of a region to the scope of the underlying variables.
+The following macros use RAII to bind the end of a region to the scope of the underlying variable.
 
 - `INSTRMT_FUNCTION()`: instrument the current scope, using the name of the function.
 - `INSTRMT_REGION(NAME)`: instrument the current scope, using a custom name.
@@ -38,78 +68,155 @@ The following macros are available:
 - `INSTRMT_LITERAL_MESSAGE(MSG)`, `INSTRMT_NAMED_LITERAL_MESSAGE(VAR, MSG)` for string literals.
 - `INSTRMT_MESSAGE(MSG)` for arbitrary strings.
 
-Note: Despite having an API for messages, VTune does not support them.
-
-## Usage
-
-### Dynamic wrapper
-
-The *instrmt* library provides a mechanism to dynamically load an instrumentation engine at runtime.
-
-To do that, include `instrmt/instrmt.hxx`, markup your code, and link against the `instrmt` library.
-
-At runtime, specify the engine to load using the `INSTRMT_ENGINE` environment variable. When undefined, the overhead should be minimal.
-
-Instrmt API can be disabled at compile time (rendering the macros no-op, and linking to the `instrmt` library not required) by defining the `INSTRMT_DISABLE` compilation option.
-
-#### Available engines
-
-- `libinstrmt-tty.so`
-
-  Available options
-  - `INSTRMT_TTY_OUT=stderr|stdout|<a file>`: Specify where to print the output.
-    When outputing to a file, if `%date%` is found in the filename, it will be replaced by the current date.
-  - `INSTRMT_TTY_TRUNCATE_OUT`: Cause the output file to be truncated before writing to it.
-  - `INSTRMT_TTY_COLOR=auto|yes|no`: Enable/disable colored output (default: auto).
-  - `INSTRMT_TTY_FORMAT=text|csv`: Specify the output format.
-- `libinstrmt-itt.so`
-- `libinstrmt-tracy.so`
-
-#### Example
+### Example
 
 ```cpp
 // main.cpp
 #include <instrmt/instrmt.hxx>
 
 void f() {
-    INSTRMT_FUNCTION();
-    // ...
+  INSTRMT_FUNCTION();
+  // ...
 }
 
 int main(int, char**) {
-    f();
-    return 0;
+  f();
+  return 0;
 }
 ```
 
-```sh
-$ g++ main.cpp -I/path/to/instrmt/include -L/path/to/instrmt/lib -linstrmt -ldl -o main
+## Usage
 
-$ ./main
-# No instrumentation
+**Instrmt** gives access to the various ecosystems through _instrumentation engines_.
 
-$ INSTRMT_ENGINE=/path/to/instrmt/lib/libinstrmt-tty.so ./main
-f                                0.0ms
-```
+### Dynamic wrapper
+
+The `instrmt` library provides a mechanism to dynamically load an instrumentation engine at runtime.
+
+To do that:
+
+- Include `instrmt/instrmt.hxx` and instrument your code.
+- Link against the `instrmt` library:
+
+  ```sh
+  g++ main.cpp -I/path/to/instrmt/include -L/path/to/instrmt/lib -linstrmt -ldl -o main
+  ```
+
+  Or using CMake:
+
+  ```cmake
+  find_package(Instrmt)
+  add_executable(main main.cpp)
+  target_link_libraries(main PRIVATE instrmt)
+  ```
+
+- When launching your application, specify the engine to load using the `INSTRMT_ENGINE` environment variable.
+
+  ```sh
+  $ ./main
+  # No instrumentation
+
+  $ INSTRMT_ENGINE=/path/to/instrmt/lib/libinstrmt-tty.so ./main
+  f                                0.0ms
+  ```
 
 ### Static wrapper
 
-If the dynamic wrapper has too much overhead, Instrmt can be used as a simple wrapper, providing just a common API above other instrumentation libraries.
+If the dynamic wrapper has too much overhead, Instrmt can be used as a simple wrapper, providing just a common API (the macros) for other instrumentation libraries.
 
 Wrappers for the _tty_, _itt_ & _tracy_ engines are provided.
 
 To use a wrapper:
 
-- Include `instrmt/instrmt.hxx` and markup your code.
-- Make sure your compiler can locate that include.
-- Add the following define: `INSTRMT_CXX_WRAPPER=\"instrmt/*/*-wrapper.hxx\"`.
-- Import the underlying library as usual (Instrmt is just a wrapper, your compiler needs to find its includes and link against it).
+- Include `instrmt/instrmt.hxx` and instrument your code.
+- Add the following define: `INSTRMT_CXX_WRAPPER=\"instrmt/xxx/xxx-wrapper.hxx\"` (with the double quotes).
+- Import the underlying library (your compiler needs to find its includes and link against it).
 
-e.g.:
+#### TTY wrapper
 
-`g++ main.cpp -I/path/to/instrmt/include -I/path/to/ittnotify/include -DINSTRMT_CXX_WRAPPER=\"instrmt/itt/itt-wrapper.hxx\" -L/path/to/ittnotify/lib littnotify -lpthread -ldl -o main`
+```sh
+g++ main.cpp -I/path/to/instrmt/include \
+  -DINSTRMT_CXX_WRAPPER=\"instrmt/tty/tty-wrapper.hxx\" \
+  -o main
+```
 
-See the `use_*_wrapper()` macros in `cmake/instrmt.cmake` for examples using CMake.
+Or using CMake:
+
+```cmake
+find_package(Instrmt)
+add_executable(main main.cpp)
+target_link_libraries(main instrmt-tty-wrapper)
+```
+
+#### ITT wrapper
+
+```sh
+g++ main.cpp -I/path/to/instrmt/include -I/path/to/ittnotify/include \
+  -DINSTRMT_CXX_WRAPPER=\"instrmt/itt/itt-wrapper.hxx\" \
+  -L/path/to/ittnotify/lib -littnotify -lpthread -ldl \
+  -o main
+```
+
+Or using CMake:
+
+```cmake
+find_package(Instrmt)
+add_executable(main main.cpp)
+target_link_libraries(main instrmt-itt-wrapper)
+```
+
+#### Tracy wrapper
+
+```sh
+g++ main.cpp -I/path/to/instrmt/include -I/path/to/tracy/include \
+  -DINSTRMT_CXX_WRAPPER=\"instrmt/tracy/tracy-wrapper.hxx\" \
+  -DTRACY_ENABLE \
+  -L/path/to/tracy/lib -lTracyClient -lpthread -ldl \
+  -o main
+```
+
+Or using CMake:
+
+```cmake
+find_package(Instrmt)
+add_executable(main main.cpp)
+target_link_libraries(main instrmt-tracy-wrapper)
+```
+
+## Noop implementation
+
+When `INSTRMT_ENGINE` is not defined, every macro that instrument your code still has a small runtime overhead.
+Your application also needlessly links to (and has to be shipped with) the `instrmt` library.
+
+All the macros can be turned noop, reducing the runtime overhead to zero, by adding the `INSTRMT_DISABLE` compile definition:
+
+```sh
+g++ main.cpp -I/path/to/instrmt/include -DINSTRMT_DISABLE -o main # No -linstrmt
+```
+
+Using CMake, link to the `instrmt-noop` target instead:
+
+```cmake
+target_link_libraries(main PRIVATE instrmt-noop)
+```
+
+## Available engines
+
+### TTY
+
+Available options (not available in static wrapper mode at the moment):
+
+- `INSTRMT_TTY_OUT=stderr|stdout|<a file>`: Specify where to print the output.\
+  When outputing to a file, if `%date%` is found in the filename, it will be replaced by the current date.
+- `INSTRMT_TTY_TRUNCATE_OUT`: Cause the output file to be truncated before writing to it.
+- `INSTRMT_TTY_COLOR=auto|yes|no`: Enable/disable colored output (default: auto).
+- `INSTRMT_TTY_FORMAT=text|csv`: Specify the output format (default: text).
+
+### ITT
+
+Note: Despite ITT API having an API for messages, VTune does not support them.
+
+### Tracy
 
 ## License
 

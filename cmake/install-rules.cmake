@@ -6,7 +6,7 @@ mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
 
 install(
   TARGETS
-  instrmt
+  instrmt instrmt-noop
   EXPORT InstrmtTargets
 )
 
@@ -68,7 +68,7 @@ install(
 )
 
 # Create the export file for the build tree.
-export(TARGETS instrmt instrmt-tty-wrapper FILE "${CMAKE_CURRENT_BINARY_DIR}/InstrmtTargets.cmake")
+export(TARGETS instrmt instrmt-noop instrmt-tty-wrapper FILE "${CMAKE_CURRENT_BINARY_DIR}/InstrmtTargets.cmake")
 
 if (INSTRMT_BUILD_ITT_ENGINE)
   export(TARGETS instrmt-itt-wrapper APPEND FILE "${CMAKE_CURRENT_BINARY_DIR}/InstrmtTargets.cmake")

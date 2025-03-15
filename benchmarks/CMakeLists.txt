@@ -14,8 +14,7 @@ target_link_libraries(instrmt-benchmarks PRIVATE instrmt)
 
 
 instrmt_benchmark(instrmt-benchmarks-disable)
-target_compile_definitions(instrmt-benchmarks-disable PRIVATE INSTRMT_DISABLE)
-target_link_libraries(instrmt-benchmarks-disable PRIVATE instrmt)
+target_link_libraries(instrmt-benchmarks-disable PRIVATE instrmt-noop)
 
 instrmt_benchmark(instrmt-benchmarks-tty)
 target_link_libraries(instrmt-benchmarks-tty PRIVATE instrmt-tty-wrapper)

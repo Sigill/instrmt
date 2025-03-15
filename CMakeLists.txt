@@ -21,13 +21,24 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 # Main library
 add_library(instrmt SHARED
   instrmt/details/engine.cxx
-  instrmt/details/utils.cxx)
+  instrmt/details/utils.cxx
+)
 
 target_include_directories(instrmt
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-       $<INSTALL_INTERFACE:include>)
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
 
 target_link_libraries(instrmt PRIVATE dl)
+
+add_library(instrmt-noop INTERFACE)
+target_compile_definitions(instrmt-noop INTERFACE INSTRMT_DISABLE)
+target_include_directories(instrmt-noop
+  INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
 
 # TTY engine
 add_library(instrmt-tty MODULE instrmt/tty/tty-engine.cxx)

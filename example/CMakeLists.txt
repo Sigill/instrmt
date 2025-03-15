@@ -9,8 +9,10 @@ find_package(Tracy)
 find_itt()
 
 add_executable(example-cpp example.cpp)
-target_compile_definitions(example-cpp PRIVATE INSTRMT_ENABLE)
 target_link_libraries(example-cpp PRIVATE instrmt)
+
+add_executable(example-cpp-noop example.cpp)
+target_link_libraries(example-cpp-noop PRIVATE instrmt-noop)
 
 add_executable(example-cpp-tty example.cpp)
 target_link_libraries(example-cpp-tty instrmt-tty-wrapper)
