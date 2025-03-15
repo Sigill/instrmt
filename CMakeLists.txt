@@ -48,7 +48,7 @@ if (INSTRMT_BUILD_ITT_ENGINE)
 
   # ITT engine
   add_library(instrmt-itt MODULE instrmt/itt/itt-engine.cxx)
-  target_link_libraries(instrmt-itt PRIVATE instrmt ittnotify)
+  target_link_libraries(instrmt-itt PRIVATE instrmt ittapi::ittnotify)
 
   # ITT wrapper
   add_library(instrmt-itt-wrapper INTERFACE)
@@ -58,7 +58,7 @@ if (INSTRMT_BUILD_ITT_ENGINE)
     $<INSTALL_INTERFACE:include>
   )
   target_compile_definitions(instrmt-itt-wrapper INTERFACE "INSTRMT_CXX_WRAPPER=\"instrmt/itt/itt-wrapper.hxx\"")
-  target_link_libraries(instrmt-itt-wrapper INTERFACE ittnotify)
+  target_link_libraries(instrmt-itt-wrapper INTERFACE ittapi::ittnotify)
 endif()
 
 option(INSTRMT_BUILD_TRACY_ENGINE "" ON)

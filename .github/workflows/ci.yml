@@ -107,8 +107,8 @@ jobs:
       id: cache-ittapi
       uses: actions/cache@v3
       with:
-        path: vendor/ittapi-3.25.3
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.25.3
+        path: vendor/ittapi-3.25.5
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.25.5
 
     - name: Cache tracy
       id: cache-tracy
@@ -121,8 +121,8 @@ jobs:
       id: cache-google-benchmark
       uses: actions/cache@v3
       with:
-        path: vendor/google-benchmark-1.9.0
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.9.0
+        path: vendor/google-benchmark-1.9.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.9.1
 
     - name: Configure and build
       run: |

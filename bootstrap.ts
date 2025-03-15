@@ -9,14 +9,12 @@ import dargs from 'dargs';
 import { execa, execaSync } from 'execa';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
-import { glob } from 'glob';
 import got from 'got';
 import isInteractive from 'is-interactive';
 import which from 'which';
 import { hashFile } from 'hasha';
 import os from 'os';
 import path from 'path';
-import pathIsInside from 'path-is-inside';
 import { promisify } from 'util';
 // import { replaceInFileSync, ReplaceInFileConfig } from 'replace-in-file';
 import { rimraf } from 'rimraf';
@@ -49,31 +47,6 @@ function cmake_build_command(bld: string, {cmake='cmake', target}: {cmake?: stri
     cmd.push('--target', target);
   cmd.push('-j', `${os.availableParallelism()}`);
   return cmd;
-}
-
-function install(files: string | string[], dir: string, {filename, base}: {filename?: string, base?: string} = {}) {
-  files = arrify(files);
-  assert(files.length > 0, 'No file to install');
-  assert(filename === undefined || files.length === 1, 'Cannot use the "filename" option when installing multiple files');
-
-  const finalPath = (f: string) => {
-    let p = base ? path.join(dir, path.relative(base, f)) : path.join(dir, path.basename(f));
-    if (filename) {
-      p = path.join(path.dirname(p), filename);
-    }
-    return p;
-  };
-
-  if (base) {
-    files.forEach(f => assert(pathIsInside(f, base), `"${f}" not in "${base}"`));
-  }
-
-  const final_paths = files.map(f => finalPath(f)).map(f => path.dirname(f));
-  new Set(final_paths).forEach(d => fs.mkdirSync(d, { recursive: true }));
-
-  files.forEach(f => {
-    fs.cpSync(f, finalPath(f), { preserveTimestamps: true });
-  });
 }
 
 // async function sed(files: string | string[], from: ReplaceInFileConfig['from'], to: ReplaceInFileConfig['to']) {
@@ -146,9 +119,9 @@ const dependencies: {
     }
   },
   ittapi: {
-    default_version: 'v3.25.3',
+    default_version: 'v3.25.5',
     versions: {
-      'v3.25.3': { checksum: 'sha256:1b46fb4cb264a2acd1a553eeea0e055b3cf1d7962decfa78d2b49febdcb03032' }
+      'v3.25.5': { checksum: 'sha256:2d19243e7ac8a7de08bfd005429a308c1db52a18e5b7b66d29a6c19f066946e3' }
     }
   },
   tracy: {
@@ -158,9 +131,9 @@ const dependencies: {
     }
   },
   'google-benchmark': {
-    default_version: 'v1.9.0',
+    default_version: 'v1.9.1',
     versions: {
-      'v1.9.0': { checksum: 'sha256:35a77f46cc782b16fac8d3b107fbfbb37dcd645f7c28eee19f3b8e0758b48994' }
+      'v1.9.1': { checksum: 'sha256:32131c08ee31eeff2c8968d7e874f3cb648034377dfc32a4c377fa8796d84981' }
     }
   }
 };
@@ -289,16 +262,8 @@ async function fetch_ittapi(ctx: Context, {directory = default_vendor_dir, versi
     skip: () => isDirectory(dirs.install) && (ctx.quiet || `${dirs.install} already exists`),
     action: async () => {
       await download_and_extract(ctx, url, archive, checksum ?? d.checksum, dirs.src, {strip_components: 1});
-      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, args: []}));
-      await execute(ctx, cmake_build_command(dirs.build));
-      step('Install', () => {
-        const headers = glob.sync(path.join(dirs.src, 'include', '**', '*.h?(pp)'));
-        install(headers, path.join(dirs.install, 'include'), {base: path.join(dirs.src, 'include')});
-        install(
-          path.join(dirs.build, 'bin', 'libittnotify.a'),
-          path.join(dirs.install, 'lib64')
-        );
-      });
+      await execute(ctx, cmake_configure_command(dirs.src, dirs.build, {buildType: cmakeBuildType, installPrefix: dirs.install, args: []}));
+      await execute(ctx, cmake_build_command(dirs.build, {target: 'install'}));
       cleanup(dirs.temp);
     }
   });
