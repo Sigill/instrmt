@@ -11,12 +11,13 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "INSTRMT_BUILD_ITT_ENGINE": true,
         "INSTRMT_BUILD_TRACY_ENGINE": true,
         "BUILD_TESTING": true,
-        "VTUNE_ROOT": {
+        "ittapi_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/ittapi-3.25.5"
+          "value": "${sourceDir}/vendor/ittapi-3.25.5/lib/cmake/ittapi"
         },
         "Tracy_DIR": {
           "type": "PATH",
