@@ -480,7 +480,7 @@ async function start_ci_container(options: any): Promise<void> {
     ...yield_if(options.dockerCache,
                 `${step_exe} rsync -a /src/node_modules/ /cache/node_modules/`),
     shellquote.quote([
-      'step', 'npm', 'run', 'bootstrap', '--', 'ci', // Not step -q otherwise there would be no output
+      'step', 'node', 'bootstrap', 'ci', // Not step -q otherwise there would be no output
       ...dargs(options, {includes: ['quiet'], ignoreFalse: true}),
       ...dargs(options, {includes: ['werror'], ignoreTrue: true}),
       ...dargs(options, {includes: ['compiler', 'cmakeVersion', 'ittapiVersion', 'tracyVersion', 'googleBenchmarkVersion']}),

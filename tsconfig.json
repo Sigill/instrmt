@@ -1,20 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es2021",
-    "lib": [],
-    "module": "nodenext",
-    "rootDir": "./",
-    "moduleResolution": "nodenext",
-    "removeComments": true,
-    "inlineSourceMap": true,
-    "newLine": "lf",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "skipLibCheck": true
-  },
-  "files": [
-    "bootstrap.ts"
-  ]
+     "noEmit": true,
+     "target": "esnext",
+     "module": "nodenext",
+     "lib": [],
+     "rewriteRelativeImportExtensions": true,
+     "erasableSyntaxOnly": true,
+     "verbatimModuleSyntax": true,
+     "newLine": "lf",
+     "forceConsistentCasingInFileNames": true,
+     "strict": true,
+     "noImplicitAny": true
+  }
 }

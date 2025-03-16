@@ -41,7 +41,7 @@ jobs:
 
     - uses: actions/setup-node@v3
       with:
-        node-version: '22'
+        node-version: '23'
 
     - name: Enable compiler
       run: |
@@ -127,4 +127,4 @@ jobs:
     - name: Configure and build
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        npm run bootstrap -- ci
+        node bootstrap.ts ci
