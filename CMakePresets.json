@@ -7,26 +7,41 @@
   },
   "configurePresets": [
     {
-      "name": "full",
+      "name": "minimal",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "INSTRMT_BUILD_ITT_ENGINE": false,
+        "INSTRMT_BUILD_TRACY_ENGINE": false,
+        "BUILD_TESTING": false,
+        "BUILD_BENCHMARKS": false
+      }
+    },
+    {
+      "name": "production",
+      "inherits": "minimal",
+      "cacheVariables": {
         "INSTRMT_BUILD_ITT_ENGINE": true,
         "INSTRMT_BUILD_TRACY_ENGINE": true,
-        "BUILD_TESTING": true,
         "ittapi_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/ittapi-3.25.5/lib/cmake/ittapi"
+          "value": "${sourceDir}/vendor/ittapi-v3.25.5/lib/cmake/ittapi"
         },
         "Tracy_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/tracy-0.11.1/share/Tracy"
-        },
+          "value": "${sourceDir}/vendor/tracy-v0.11.1/share/Tracy"
+        }
+      }
+    },
+    {
+      "name": "full",
+      "inherits": "production",
+      "cacheVariables": {
+        "BUILD_TESTING": true,
         "BUILD_BENCHMARKS": true,
         "benchmark_DIR": {
           "type": "PATH",
-          "value": "${sourceDir}/vendor/google-benchmark-1.9.1/lib/cmake/benchmark"
+          "value": "${sourceDir}/vendor/google-benchmark-v1.9.1/lib/cmake/benchmark"
         }
       }
     }
