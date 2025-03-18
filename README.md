@@ -10,6 +10,18 @@ It especially supports with:
 
 ## Quick start
 
+### Build Instrmt
+
+```sh
+./scripts/fetch-ittapi.sh
+./scripts/fetch-tracy.sh
+
+cmake --preset=production
+cmake --build build/
+```
+
+### Instrument your project
+
 ```cmake
 # CMakeLists.txt
 cmake_minimum_required(VERSION 3.14)
@@ -32,9 +44,9 @@ int main(int, char**) {
 ```
 
 ```sh
-$ cmake -S . -B build/ -DInstrmt_DIR=
+$ cmake -S . -B build/ -DInstrmt_DIR=/path/to/instrmt/build
 $ cmake --build build/
-$ INSTRMT_ENGINE=/path/to/instrmt/lib/libinstrmt-tty.so ./build/app
+$ INSTRMT_ENGINE=/path/to/instrmt/build/libinstrmt-tty.so ./build/app
 main                                     0.1 ms
 ```
 

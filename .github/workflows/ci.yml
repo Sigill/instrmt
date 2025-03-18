@@ -107,24 +107,25 @@ jobs:
       id: cache-ittapi
       uses: actions/cache@v3
       with:
-        path: vendor/ittapi-3.25.5
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-3.25.5
+        path: vendor/ittapi-v3.25.5
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-ittapi-v3.25.5
 
     - name: Cache tracy
       id: cache-tracy
       uses: actions/cache@v3
       with:
-        path: vendor/tracy-0.11.1
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-tracy-0.11.1
+        path: vendor/tracy-v0.11.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-tracy-v0.11.1
 
     - name: Cache google-benchmark
       id: cache-google-benchmark
       uses: actions/cache@v3
       with:
-        path: vendor/google-benchmark-1.9.1
-        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-1.9.1
+        path: vendor/google-benchmark-v1.9.1
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-google-benchmark-v1.9.1
 
     - name: Configure and build
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        node bootstrap.ts ci
+
+        ./scripts/ci.sh
