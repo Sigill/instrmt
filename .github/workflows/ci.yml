@@ -39,10 +39,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - uses: actions/setup-node@v3
-      with:
-        node-version: '23'
-
     - name: Enable compiler
       run: |
         case ${{ matrix.compiler }} in
@@ -97,12 +93,6 @@ jobs:
       with:
         key: ${{ matrix.os }}-${{ matrix.compiler }}
 
-    - name: Install node modules
-      run: npm i --progress=false
-
-    - name: Run eslint
-      run: npm run lint
-
     - name: Cache ittapi
       id: cache-ittapi
       uses: actions/cache@v3
@@ -127,5 +117,4 @@ jobs:
     - name: Configure and build
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-
         ./scripts/ci.sh
